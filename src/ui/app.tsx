@@ -152,11 +152,7 @@ function App() {
 												key={record.market.marketId}
 											>
 												<summary>
-													<span>
-														{record.market.temperatureBand ??
-															record.market.marketTitle ??
-															record.market.marketId}
-													</span>
+													<span>{renderTemperatureRange(record.market)}</span>
 													<span>
 														{record.market.temperatureKind ?? "unknown"} /{" "}
 														{record.market.unit ?? "?"}
@@ -190,6 +186,26 @@ function App() {
 			</section>
 		</main>
 	);
+}
+
+function renderTemperatureRange(market: TemperatureMarket): string {
+	if (market.temperatureMin == null && market.temperatureMax == null) {
+		return market.marketTitle ?? market.marketId;
+	}
+
+	if (market.temperatureMin == null) {
+		return `${market.temperatureMax}${market.unit ?? ""} or below`;
+	}
+
+	if (market.temperatureMax == null) {
+		return `${market.temperatureMin}${market.unit ?? ""} or higher`;
+	}
+
+	if (market.temperatureMin === market.temperatureMax) {
+		return `${market.temperatureMin}${market.unit ?? ""}`;
+	}
+
+	return `${market.temperatureMin}-${market.temperatureMax}${market.unit ?? ""}`;
 }
 
 const root = document.getElementById("root");

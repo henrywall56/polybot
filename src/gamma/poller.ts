@@ -54,7 +54,8 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 					JSON.stringify({
 						city: market.city,
 						temperatureKind: market.temperatureKind,
-						temperatureBand: market.temperatureBand,
+						temperatureMax: market.temperatureMax,
+						temperatureMin: market.temperatureMin,
 						unit: market.unit,
 					})
 				)

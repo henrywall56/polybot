@@ -26,8 +26,8 @@ describe("mapTemperatureMarkets", () => {
 			marketTitle:
 				"Will the highest temperature in Seattle be 57°F or below on April 22?",
 			marketUpdatedAt: "2026-04-23T08:29:33.60825Z",
-			temperatureBand: "57°F or below",
-			temperatureBandIndex: 0,
+			temperatureMax: 57,
+			temperatureMin: null,
 			temperatureKind: "high",
 			unit: "F",
 			volume: 12_854.982_708_999_993,
@@ -39,8 +39,8 @@ describe("mapTemperatureMarkets", () => {
 
 		expect(market.city).toBe("Berlin");
 		expect(market.temperatureKind).toBe("low");
-		expect(market.temperatureBand).toBe("3-4°C");
-		expect(market.temperatureBandIndex).toBe(2);
+		expect(market.temperatureMax).toBe(4);
+		expect(market.temperatureMin).toBe(3);
 		expect(market.unit).toBe("C");
 		expect(market.marketDate).toBe("2026-04-23T12:00:00Z");
 		expect(market.acceptingOrders).toBe(false);
@@ -63,8 +63,8 @@ describe("mapTemperatureMarkets", () => {
 
 		expect(market.city).toBe("Los Angeles");
 		expect(market.temperatureKind).toBe("high");
-		expect(market.temperatureBand).toBe("74°F or higher");
-		expect(market.temperatureBandIndex).toBe(10);
+		expect(market.temperatureMax).toBeNull();
+		expect(market.temperatureMin).toBe(74);
 		expect(market.unit).toBe("F");
 	});
 
@@ -73,8 +73,8 @@ describe("mapTemperatureMarkets", () => {
 
 		expect(market.city).toBeNull();
 		expect(market.temperatureKind).toBeNull();
-		expect(market.temperatureBand).toBeNull();
-		expect(market.temperatureBandIndex).toBeNull();
+		expect(market.temperatureMax).toBeNull();
+		expect(market.temperatureMin).toBeNull();
 		expect(market.unit).toBeNull();
 		expect(market.marketDate).toBe("2026-04-25T12:00:00Z");
 		expect(market.acceptingOrders).toBeNull();

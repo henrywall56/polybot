@@ -63,15 +63,17 @@ export interface TemperatureMarket {
 	marketSlug: string | null;
 	marketTitle: string | null;
 	marketUpdatedAt: string | null;
-	temperatureBand: string | null;
-	temperatureBandIndex: number | null;
 	temperatureKind: TemperatureKind | null;
+	temperatureMax: number | null;
+	temperatureMin: number | null;
 	unit: TemperatureUnit | null;
 	volume: number | null;
 }
 
 const PAGE_SIZE = 100;
 const TEMPERATURE_TITLE_PATTERN = /temperature in (.+?) on/i;
+const TEMPERATURE_RANGE_PATTERN = /(-?\d+)\s*-\s*(-?\d+)/;
+const TEMPERATURE_VALUE_PATTERN = /-?\d+/;
 
 export async function fetchAllActiveEventsByTagId(
 	tagId: string
@@ -167,18 +169,6 @@ function extractTemperatureKind(event: GammaEvent): TemperatureKind | null {
 	return null;
 }
 
-function extractTemperatureBandIndex(
-	groupItemThreshold: string | null
-): number | null {
-	if (groupItemThreshold == null) {
-		return null;
-	}
-
-	const parsed = Number(groupItemThreshold);
-
-	return Number.isFinite(parsed) ? parsed : null;
-}
-
 function extractUnit(groupItemTitle: string | null): TemperatureUnit | null {
 	if (groupItemTitle == null) {
 		return null;
@@ -195,36 +185,69 @@ function extractUnit(groupItemTitle: string | null): TemperatureUnit | null {
 	return null;
 }
 
+function extractTemperatureRange(
+	groupItemTitle: string | null
+): Pick<TemperatureMarket, "temperatureMax" | "temperatureMin"> {
+	if (groupItemTitle == null) {
+		return { temperatureMax: null, temperatureMin: null };
+	}
+
+	const rangeMatch = groupItemTitle.match(TEMPERATURE_RANGE_PATTERN);
+	const singleValueMatch = groupItemTitle.match(TEMPERATURE_VALUE_PATTERN);
+	const minimum = rangeMatch ? Number(rangeMatch[1]) : null;
+	const maximum = rangeMatch ? Number(rangeMatch[2]) : null;
+	const value = singleValueMatch ? Number(singleValueMatch[0]) : null;
+
+	if (groupItemTitle.toLowerCase().includes("or below")) {
+		return { temperatureMax: value, temperatureMin: null };
+	}
+
+	if (groupItemTitle.toLowerCase().includes("or higher")) {
+		return { temperatureMax: null, temperatureMin: value };
+	}
+
+	if (minimum == null || maximum == null) {
+		return { temperatureMax: value, temperatureMin: value };
+	}
+
+	return {
+		temperatureMax: maximum,
+		temperatureMin: minimum,
+	};
+}
+
 export function mapTemperatureMarkets(
 	events: GammaEvent[]
 ): TemperatureMarket[] {
 	return events.flatMap((event) =>
-		event.markets.map((market) => ({
-			marketId: market.id,
-			marketSlug: market.slug,
-			marketTitle: market.question,
-			eventId: event.id,
-			eventSlug: event.slug,
-			eventTitle: event.title,
-			city: extractCity(event),
-			temperatureKind: extractTemperatureKind(event),
-			temperatureBand: market.groupItemTitle,
-			temperatureBandIndex: extractTemperatureBandIndex(
-				market.groupItemThreshold
-			),
-			unit: extractUnit(market.groupItemTitle),
-			marketDate: event.eventDate ?? event.endDate,
-			marketEndDate: market.endDate,
-			eventUpdatedAt: event.updatedAt,
-			marketUpdatedAt: market.updatedAt,
-			active: market.active ?? null,
-			closed: market.closed ?? null,
-			acceptingOrders: market.acceptingOrders ?? null,
-			bestBid: market.bestBid ?? null,
-			bestAsk: market.bestAsk ?? null,
-			lastTradePrice: market.lastTradePrice ?? null,
-			volume: market.volumeNum ?? null,
-			liquidity: market.liquidityNum ?? null,
-		}))
+		event.markets.map((market) => {
+			const temperatureRange = extractTemperatureRange(market.groupItemTitle);
+
+			return {
+				marketId: market.id,
+				marketSlug: market.slug,
+				marketTitle: market.question,
+				eventId: event.id,
+				eventSlug: event.slug,
+				eventTitle: event.title,
+				city: extractCity(event),
+				temperatureKind: extractTemperatureKind(event),
+				temperatureMax: temperatureRange.temperatureMax,
+				temperatureMin: temperatureRange.temperatureMin,
+				unit: extractUnit(market.groupItemTitle),
+				marketDate: event.eventDate ?? event.endDate,
+				marketEndDate: market.endDate,
+				eventUpdatedAt: event.updatedAt,
+				marketUpdatedAt: market.updatedAt,
+				active: market.active ?? null,
+				closed: market.closed ?? null,
+				acceptingOrders: market.acceptingOrders ?? null,
+				bestBid: market.bestBid ?? null,
+				bestAsk: market.bestAsk ?? null,
+				lastTradePrice: market.lastTradePrice ?? null,
+				volume: market.volumeNum ?? null,
+				liquidity: market.liquidityNum ?? null,
+			};
+		})
 	);
 }
