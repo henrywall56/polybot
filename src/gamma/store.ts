@@ -13,9 +13,29 @@ export interface TemperatureMarketSnapshot {
 	events: GammaEvent[];
 	marketPriceHistoryByMarketId: Record<string, MarketPricePoint[]>;
 	markets: TemperatureMarket[];
+	orderBookByMarketId?: Record<string, unknown>;
 	records: TemperatureMarketRecord[];
 	updatedAt: string | null;
 	weatherByMarketId: Record<string, MarketWeatherSnapshot>;
+}
+
+export interface TemperatureMarketListSnapshot {
+	error: string | null;
+	eventCount: number;
+	marketCount: number;
+	records: Array<{
+		event: Pick<GammaEvent, "id" | "title">;
+		market: TemperatureMarket;
+	}>;
+	updatedAt: string | null;
+}
+
+export interface TemperatureMarketDetailSnapshot {
+	event: GammaEvent;
+	market: TemperatureMarket;
+	priceHistory: MarketPricePoint[];
+	rawMarket: GammaEvent["markets"][number];
+	weather: MarketWeatherSnapshot | null;
 }
 
 const temperatureMarketSnapshot: TemperatureMarketSnapshot = {
@@ -32,6 +52,43 @@ export function getTemperatureMarketSnapshot(): TemperatureMarketSnapshot {
 	return temperatureMarketSnapshot;
 }
 
+export function getTemperatureMarketListSnapshot(): TemperatureMarketListSnapshot {
+	return {
+		error: temperatureMarketSnapshot.error,
+		eventCount: temperatureMarketSnapshot.events.length,
+		marketCount: temperatureMarketSnapshot.markets.length,
+		records: temperatureMarketSnapshot.records.map((record) => ({
+			event: {
+				id: record.event.id,
+				title: record.event.title,
+			},
+			market: record.market,
+		})),
+		updatedAt: temperatureMarketSnapshot.updatedAt,
+	};
+}
+
+export function getTemperatureMarketDetailSnapshot(
+	marketId: string
+): TemperatureMarketDetailSnapshot | null {
+	const record = temperatureMarketSnapshot.records.find(
+		(item) => item.market.marketId === marketId
+	);
+
+	if (!record) {
+		return null;
+	}
+
+	return {
+		event: record.event,
+		market: record.market,
+		priceHistory:
+			temperatureMarketSnapshot.marketPriceHistoryByMarketId[marketId] ?? [],
+		rawMarket: record.rawMarket,
+		weather: temperatureMarketSnapshot.weatherByMarketId[marketId] ?? null,
+	};
+}
+
 export function setTemperatureMarketSnapshot(
 	snapshot: TemperatureMarketSnapshot
 ): void {
@@ -40,6 +97,7 @@ export function setTemperatureMarketSnapshot(
 	temperatureMarketSnapshot.marketPriceHistoryByMarketId =
 		snapshot.marketPriceHistoryByMarketId;
 	temperatureMarketSnapshot.markets = snapshot.markets;
+	temperatureMarketSnapshot.orderBookByMarketId = snapshot.orderBookByMarketId;
 	temperatureMarketSnapshot.records = snapshot.records;
 	temperatureMarketSnapshot.updatedAt = snapshot.updatedAt;
 	temperatureMarketSnapshot.weatherByMarketId = snapshot.weatherByMarketId;

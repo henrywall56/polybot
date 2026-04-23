@@ -197,7 +197,7 @@ Each opened market shows:
 - Raw Gamma event payload.
 - Raw Gamma market payload.
 
-The graph view model displays CLOB prices as dollar-denominated contract prices, filters history by the selected horizon, pads the x-axis by 5% on both sides of the visible points, and narrows each graph's y-axis around its own bid/ask data.
+The graph view model displays CLOB prices as dollar-denominated contract prices, filters history by the selected horizon, pads the x-axis by 5% on both sides of the visible points, and keeps each graph's y-axis fixed from 0 to 1 so bid/ask moves are not visually exaggerated by auto-scaling.
 
 ## Testing and Checks
 

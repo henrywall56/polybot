@@ -167,12 +167,12 @@ export function buildMarketPriceGraphSeries(
 	return {
 		noAskValues,
 		noBidValues,
-		noYRange: buildPaddedPriceRange([...noBidValues, ...noAskValues]),
+		noYRange: [0, 1],
 		timestamps: history.map((point) => point.timestamp),
 		xRange: buildPaddedTimeRange(history),
 		yesAskValues,
 		yesBidValues,
-		yesYRange: buildPaddedPriceRange([...yesBidValues, ...yesAskValues]),
+		yesYRange: [0, 1],
 	};
 }
 
@@ -240,21 +240,4 @@ function buildPaddedTimeRange(
 		new Date(minimum - padding).toISOString(),
 		new Date(maximum + padding).toISOString(),
 	];
-}
-
-function buildPaddedPriceRange(values: Array<number | null>): [number, number] {
-	const finiteValues = values.filter(
-		(value): value is number => value != null && Number.isFinite(value)
-	);
-
-	if (finiteValues.length === 0) {
-		return [0, 1];
-	}
-
-	const minimum = Math.min(...finiteValues);
-	const maximum = Math.max(...finiteValues);
-	const span = maximum - minimum;
-	const padding = span > 0 ? span * 0.05 : 1;
-
-	return [Math.max(0, minimum - padding), Math.min(1, maximum + padding)];
 }
