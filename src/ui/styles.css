@@ -73,6 +73,34 @@ details > summary {
 	cursor: pointer;
 }
 
+.market-summary-meta {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+	justify-content: flex-end;
+}
+
+.market-status {
+	padding: 3px 7px;
+	font-size: 0.78rem;
+	font-weight: 700;
+	line-height: 1;
+	color: #fffdf8;
+	background: #146c5f;
+	border-radius: 6px;
+}
+
+.market-status-closed,
+.market-status-inactive {
+	background: #8d251c;
+}
+
+.market-status-not-accepting-orders {
+	color: #13211a;
+	background: #d9b75f;
+}
+
 .group-content {
 	display: grid;
 	gap: 12px;
@@ -87,7 +115,7 @@ pre {
 	line-height: 1.45;
 }
 
-.probability-panel {
+.price-panel {
 	display: grid;
 	gap: 10px;
 	padding: 12px;
@@ -145,7 +173,7 @@ pre {
 	overflow-wrap: anywhere;
 }
 
-.probability-toolbar {
+.price-toolbar {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px;
@@ -154,7 +182,7 @@ pre {
 	border: 0;
 }
 
-.probability-toolbar button {
+.price-toolbar button {
 	min-height: 34px;
 	padding: 6px 10px;
 	font: inherit;
@@ -166,14 +194,19 @@ pre {
 	border-radius: 6px;
 }
 
-.probability-toolbar button[aria-pressed="true"] {
+.price-toolbar button[aria-pressed="true"] {
 	color: #fffdf8;
 	background: #146c5f;
 	border-color: #146c5f;
 }
 
-.probability-plot {
-	min-height: 320px;
+.price-plot-grid {
+	display: grid;
+	gap: 12px;
+}
+
+.price-plot {
+	min-height: 260px;
 }
 
 .empty-state {

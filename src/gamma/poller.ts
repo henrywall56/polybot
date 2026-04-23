@@ -1,12 +1,12 @@
 import {
+	getPriceHistoryByMarketId,
+	recordMarketPriceHistory,
+} from "./market-price-history.ts";
+import {
 	fetchAllActiveEventsByTagId,
 	type GammaMarket,
 	mapTemperatureMarkets,
 } from "./markets.ts";
-import {
-	getProbabilityHistoryByMarketId,
-	recordMarketProbabilityHistory,
-} from "./probability-history.ts";
 import {
 	getTemperatureMarketSnapshot,
 	setTemperatureMarketSnapshot,
@@ -55,14 +55,18 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 				return [{ event, market, rawMarket }];
 			});
 			const updatedAt = new Date().toISOString();
-			recordMarketProbabilityHistory(rawMarkets, new Date(updatedAt));
+			try {
+				await recordMarketPriceHistory(rawMarkets, new Date(updatedAt));
+			} catch (error) {
+				console.error("CLOB price history poll failed:", error);
+			}
 			const elapsedMs = Date.now() - startedAt;
 
 			setTemperatureMarketSnapshot({
 				error: null,
 				events,
+				marketPriceHistoryByMarketId: getPriceHistoryByMarketId(),
 				markets,
-				probabilityHistoryByMarketId: getProbabilityHistoryByMarketId(),
 				records,
 				updatedAt,
 				weatherByMarketId: getTemperatureMarketSnapshot().weatherByMarketId,
@@ -78,8 +82,8 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 			setTemperatureMarketSnapshot({
 				error: error instanceof Error ? error.message : String(error),
 				events: [],
+				marketPriceHistoryByMarketId: getPriceHistoryByMarketId(),
 				markets: [],
-				probabilityHistoryByMarketId: getProbabilityHistoryByMarketId(),
 				records: [],
 				updatedAt: null,
 				weatherByMarketId: getTemperatureMarketSnapshot().weatherByMarketId,

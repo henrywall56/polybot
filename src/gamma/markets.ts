@@ -19,6 +19,8 @@ const gammaMarketSchema = z.object({
 	active: z.boolean().optional(),
 	closed: z.boolean().optional(),
 	acceptingOrders: z.boolean().optional(),
+	clobTokenIds: z.string().nullable().optional(),
+	outcomes: z.string().nullable().optional(),
 	outcomePrices: z.string().nullable().optional(),
 	bestBid: z.number().nullable().optional(),
 	bestAsk: z.number().nullable().optional(),

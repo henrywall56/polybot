@@ -2,6 +2,10 @@ import { z } from "zod";
 
 const envSchema = z.object({
 	POLYMARKET_GAMMA_BASE_URL: z.string().url(),
+	POLYMARKET_CLOB_BASE_URL: z
+		.string()
+		.url()
+		.default("https://clob.polymarket.com"),
 	AVIATION_WEATHER_BASE_URL: z
 		.string()
 		.url()

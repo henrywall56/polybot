@@ -1,9 +1,9 @@
+import type { MarketPricePoint } from "../gamma/market-price-history.ts";
 import type {
 	GammaEvent,
 	GammaMarket,
 	TemperatureMarket,
 } from "../gamma/markets.ts";
-import type { MarketProbabilityPoint } from "../gamma/probability-history.ts";
 import type { MarketWeatherSnapshot } from "../weather/types.ts";
 
 export interface TemperatureMarketRecord {
@@ -22,7 +22,7 @@ export interface GroupedCity {
 	events: GroupedEvent[];
 }
 
-export type ProbabilityGraphHorizon =
+export type PriceGraphHorizon =
 	| 60_000
 	| 120_000
 	| 180_000
@@ -30,9 +30,9 @@ export type ProbabilityGraphHorizon =
 	| 300_000
 	| null;
 
-export const probabilityGraphHorizons: Array<{
+export const priceGraphHorizons: Array<{
 	label: string;
-	value: ProbabilityGraphHorizon;
+	value: PriceGraphHorizon;
 }> = [
 	{ label: "1m", value: 60_000 },
 	{ label: "2m", value: 120_000 },
@@ -42,9 +42,31 @@ export const probabilityGraphHorizons: Array<{
 	{ label: "All retained", value: null },
 ];
 
-export interface ProbabilityGraphSeries {
-	percentValues: number[];
+export interface MarketPriceGraphSeries {
+	noAskValues: Array<number | null>;
+	noBidValues: Array<number | null>;
+	noYRange: [number, number];
 	timestamps: string[];
+	xRange: [string, string] | null;
+	yesAskValues: Array<number | null>;
+	yesBidValues: Array<number | null>;
+	yesYRange: [number, number];
+}
+
+export function renderMarketStatus(market: TemperatureMarket): string {
+	if (market.closed === true) {
+		return "Closed";
+	}
+
+	if (market.active === false) {
+		return "Inactive";
+	}
+
+	if (market.acceptingOrders === false) {
+		return "Not accepting orders";
+	}
+
+	return "Open";
 }
 
 export function formatDistanceKm(distanceKm: number): string {
@@ -120,11 +142,11 @@ export function renderTemperatureRange(market: TemperatureMarket): string {
 	return `${market.temperatureMin}-${market.temperatureMax}${market.unit ?? ""}`;
 }
 
-export function filterProbabilityHistory(
-	history: MarketProbabilityPoint[],
-	horizon: ProbabilityGraphHorizon,
+export function filterMarketPriceHistory(
+	history: MarketPricePoint[],
+	horizon: PriceGraphHorizon,
 	now = Date.now()
-): MarketProbabilityPoint[] {
+): MarketPricePoint[] {
 	if (horizon == null) {
 		return history;
 	}
@@ -134,11 +156,105 @@ export function filterProbabilityHistory(
 	return history.filter((point) => Date.parse(point.timestamp) >= cutoff);
 }
 
-export function buildProbabilityGraphSeries(
-	history: MarketProbabilityPoint[]
-): ProbabilityGraphSeries {
+export function buildMarketPriceGraphSeries(
+	history: MarketPricePoint[]
+): MarketPriceGraphSeries {
+	const yesBidValues = history.map((point) => point.yesBid);
+	const yesAskValues = history.map((point) => point.yesAsk);
+	const noBidValues = history.map((point) => point.noBid);
+	const noAskValues = history.map((point) => point.noAsk);
+
 	return {
-		percentValues: history.map((point) => point.yesProbability * 100),
+		noAskValues,
+		noBidValues,
+		noYRange: buildPaddedPriceRange([...noBidValues, ...noAskValues]),
 		timestamps: history.map((point) => point.timestamp),
+		xRange: buildPaddedTimeRange(history),
+		yesAskValues,
+		yesBidValues,
+		yesYRange: buildPaddedPriceRange([...yesBidValues, ...yesAskValues]),
 	};
+}
+
+export function buildPriceHoverTemplate(label: string): string {
+	return `%{x}<br>${label}: $%{y:.3f}<extra></extra>`;
+}
+
+export function buildPriceGraphLayout({
+	title,
+	xRange,
+	yRange,
+}: {
+	title: string;
+	xRange: [string, string] | null;
+	yRange: [number, number];
+}) {
+	return {
+		autosize: true,
+		dragmode: "pan" as const,
+		font: {
+			color: "#13211a",
+			family:
+				"Iowan Old Style, Palatino Linotype, Book Antiqua, Palatino, serif",
+		},
+		margin: { b: 42, l: 58, r: 20, t: 34 },
+		paper_bgcolor: "rgba(255, 251, 244, 0)",
+		plot_bgcolor: "rgba(255, 251, 244, 0.68)",
+		showlegend: true,
+		title: {
+			font: { size: 15 },
+			text: title,
+		},
+		xaxis: {
+			gridcolor: "rgba(19, 33, 26, 0.12)",
+			range: xRange ?? undefined,
+			title: { text: "Time" },
+			type: "date" as const,
+		},
+		yaxis: {
+			gridcolor: "rgba(19, 33, 26, 0.12)",
+			range: yRange,
+			tickprefix: "$",
+			title: { text: "Executable price" },
+		},
+	};
+}
+
+function buildPaddedTimeRange(
+	history: MarketPricePoint[]
+): [string, string] | null {
+	const timestamps = history
+		.map((point) => Date.parse(point.timestamp))
+		.filter(Number.isFinite);
+
+	if (timestamps.length === 0) {
+		return null;
+	}
+
+	const minimum = Math.min(...timestamps);
+	const maximum = Math.max(...timestamps);
+	const span = maximum - minimum;
+	const padding = span > 0 ? span * 0.05 : 30_000;
+
+	return [
+		new Date(minimum - padding).toISOString(),
+		new Date(maximum + padding).toISOString(),
+	];
+}
+
+function buildPaddedPriceRange(values: Array<number | null>): [number, number] {
+	const finiteValues = values.filter(
+		(value): value is number => value != null && Number.isFinite(value)
+	);
+
+	if (finiteValues.length === 0) {
+		return [0, 1];
+	}
+
+	const minimum = Math.min(...finiteValues);
+	const maximum = Math.max(...finiteValues);
+	const span = maximum - minimum;
+	const padding = span > 0 ? span * 0.05 : 1;
+
+	return [Math.max(0, minimum - padding), Math.min(1, maximum + padding)];
 }

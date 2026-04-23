@@ -1,22 +1,25 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import PlotComponent from "react-plotly.js";
+import type { MarketPricePoint } from "../gamma/market-price-history.ts";
 import type {
 	GammaEvent,
 	GammaMarket,
 	TemperatureMarket,
 } from "../gamma/markets.ts";
-import type { MarketProbabilityPoint } from "../gamma/probability-history.ts";
 import type { TemperatureMarketSnapshot } from "../gamma/store.ts";
 import type { MarketWeatherSnapshot } from "../weather/types.ts";
 import {
-	buildProbabilityGraphSeries,
-	filterProbabilityHistory,
+	buildMarketPriceGraphSeries,
+	buildPriceGraphLayout,
+	buildPriceHoverTemplate,
+	filterMarketPriceHistory,
 	formatDistanceKm,
 	formatTemperatureCelsius,
 	groupByCity,
-	type ProbabilityGraphHorizon,
-	probabilityGraphHorizons,
+	type PriceGraphHorizon,
+	priceGraphHorizons,
+	renderMarketStatus,
 	renderTemperatureRange,
 	renderWeatherComparison,
 } from "./view-model.ts";
@@ -48,6 +51,18 @@ function renderValue(value: unknown): string {
 	return JSON.stringify(value, null, 2);
 }
 
+function MarketStatusBadge({ market }: { market: TemperatureMarket }) {
+	const status = renderMarketStatus(market);
+
+	return (
+		<span
+			className={`market-status market-status-${status.toLowerCase().replaceAll(" ", "-")}`}
+		>
+			{status}
+		</span>
+	);
+}
+
 function LazyDetails({
 	children,
 	className,
@@ -74,24 +89,73 @@ function LazyDetails({
 	);
 }
 
-function ProbabilityGraph({
-	history,
-	marketTitle,
+function PricePlot({
+	askValues,
+	bidValues,
+	outcome,
+	timestamps,
+	xRange,
+	yRange,
 }: {
-	history: MarketProbabilityPoint[];
-	marketTitle: string | null;
+	askValues: Array<number | null>;
+	bidValues: Array<number | null>;
+	outcome: "No" | "Yes";
+	timestamps: string[];
+	xRange: [string, string] | null;
+	yRange: [number, number];
 }) {
-	const [horizon, setHorizon] = useState<ProbabilityGraphHorizon>(null);
-	const filteredHistory = filterProbabilityHistory(history, horizon);
-	const series = buildProbabilityGraphSeries(filteredHistory);
+	const color = outcome === "Yes" ? "#146c5f" : "#8d251c";
 
 	return (
-		<section className="probability-panel">
-			<fieldset
-				aria-label="Probability graph horizon"
-				className="probability-toolbar"
-			>
-				{probabilityGraphHorizons.map((option) => (
+		<Plot
+			className="price-plot"
+			config={{
+				displaylogo: false,
+				modeBarButtonsToRemove: ["lasso2d", "select2d"],
+				responsive: true,
+			}}
+			data={[
+				{
+					hovertemplate: buildPriceHoverTemplate(`${outcome} bid`),
+					line: { color, dash: "solid", width: 2 },
+					marker: { color, size: 5 },
+					mode: "lines+markers",
+					name: `${outcome} bid`,
+					type: "scatter",
+					x: timestamps,
+					y: bidValues,
+				},
+				{
+					hovertemplate: buildPriceHoverTemplate(`${outcome} ask`),
+					line: { color, dash: "dot", width: 2 },
+					marker: { color, size: 5 },
+					mode: "lines+markers",
+					name: `${outcome} ask`,
+					type: "scatter",
+					x: timestamps,
+					y: askValues,
+				},
+			]}
+			layout={buildPriceGraphLayout({
+				title: `${outcome} executable bid/ask`,
+				xRange,
+				yRange,
+			})}
+			style={{ height: "260px", width: "100%" }}
+			useResizeHandler
+		/>
+	);
+}
+
+function MarketPriceGraph({ history }: { history: MarketPricePoint[] }) {
+	const [horizon, setHorizon] = useState<PriceGraphHorizon>(null);
+	const filteredHistory = filterMarketPriceHistory(history, horizon);
+	const series = buildMarketPriceGraphSeries(filteredHistory);
+
+	return (
+		<section className="price-panel">
+			<fieldset aria-label="CLOB price graph horizon" className="price-toolbar">
+				{priceGraphHorizons.map((option) => (
 					<button
 						aria-pressed={horizon === option.value}
 						key={option.label}
@@ -104,57 +168,26 @@ function ProbabilityGraph({
 			</fieldset>
 
 			{series.timestamps.length === 0 ? (
-				<p className="empty-state">No valid implied probability history yet.</p>
+				<p className="empty-state">No valid CLOB bid/ask history yet.</p>
 			) : (
-				<Plot
-					className="probability-plot"
-					config={{
-						displaylogo: false,
-						modeBarButtonsToRemove: ["lasso2d", "select2d"],
-						responsive: true,
-					}}
-					data={[
-						{
-							hovertemplate: "%{x}<br>Yes: %{y:.2f}%<extra></extra>",
-							line: { color: "#146c5f", width: 2 },
-							marker: { color: "#146c5f", size: 5 },
-							mode: "lines+markers",
-							name: "Yes",
-							type: "scatter",
-							x: series.timestamps,
-							y: series.percentValues,
-						},
-					]}
-					layout={{
-						autosize: true,
-						dragmode: "pan",
-						font: {
-							color: "#13211a",
-							family:
-								"Iowan Old Style, Palatino Linotype, Book Antiqua, Palatino, serif",
-						},
-						margin: { b: 44, l: 54, r: 20, t: 28 },
-						paper_bgcolor: "rgba(255, 251, 244, 0)",
-						plot_bgcolor: "rgba(255, 251, 244, 0.68)",
-						title: {
-							font: { size: 15 },
-							text: marketTitle ?? "Implied Yes probability",
-						},
-						xaxis: {
-							gridcolor: "rgba(19, 33, 26, 0.12)",
-							title: { text: "Time" },
-							type: "date",
-						},
-						yaxis: {
-							gridcolor: "rgba(19, 33, 26, 0.12)",
-							range: [0, 100],
-							ticksuffix: "%",
-							title: { text: "Yes probability" },
-						},
-					}}
-					style={{ height: "320px", width: "100%" }}
-					useResizeHandler
-				/>
+				<div className="price-plot-grid">
+					<PricePlot
+						askValues={series.yesAskValues}
+						bidValues={series.yesBidValues}
+						outcome="Yes"
+						timestamps={series.timestamps}
+						xRange={series.xRange}
+						yRange={series.yesYRange}
+					/>
+					<PricePlot
+						askValues={series.noAskValues}
+						bidValues={series.noBidValues}
+						outcome="No"
+						timestamps={series.timestamps}
+						xRange={series.xRange}
+						yRange={series.noYRange}
+					/>
+				</div>
 			)}
 		</section>
 	);
@@ -287,8 +320,8 @@ function App() {
 		() => groupByCity(snapshot?.records ?? []),
 		[snapshot?.records]
 	);
-	const probabilityHistoryByMarketId =
-		snapshot?.probabilityHistoryByMarketId ?? {};
+	const marketPriceHistoryByMarketId =
+		snapshot?.marketPriceHistoryByMarketId ?? {};
 	const weatherByMarketId = snapshot?.weatherByMarketId ?? {};
 
 	return (
@@ -351,9 +384,12 @@ function App() {
 																<span>
 																	{renderTemperatureRange(record.market)}
 																</span>
-																<span>
-																	{record.market.temperatureKind ?? "unknown"} /{" "}
-																	{record.market.unit ?? "?"}
+																<span className="market-summary-meta">
+																	<MarketStatusBadge market={record.market} />
+																	<span>
+																		{record.market.temperatureKind ?? "unknown"}{" "}
+																		/ {record.market.unit ?? "?"}
+																	</span>
 																</span>
 															</>
 														}
@@ -367,17 +403,16 @@ function App() {
 																	}
 																/>
 
-																<ProbabilityGraph
+																<MarketPriceGraph
 																	history={
-																		probabilityHistoryByMarketId[
+																		marketPriceHistoryByMarketId[
 																			record.market.marketId
 																		] ?? []
 																	}
-																	marketTitle={record.market.marketTitle}
 																/>
 
 																<details open>
-																	<summary>Mapped fields</summary>
+																	<summary>Mapped Gamma market fields</summary>
 																	<pre>{renderValue(record.market)}</pre>
 																</details>
 
