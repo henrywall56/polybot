@@ -1,25 +1,53 @@
 import { z } from "zod";
 import { env } from "../config/env.ts";
 
+const gammaTagSchema = z.object({
+	id: z.string(),
+	slug: z.string().nullable(),
+	label: z.string().nullable(),
+});
+
 const gammaMarketSchema = z.object({
 	id: z.string(),
 	slug: z.string().nullable(),
 	question: z.string().nullable(),
+	groupItemTitle: z.string().nullable(),
+	groupItemThreshold: z.string().nullable(),
+	endDate: z.string().nullable(),
+	startDate: z.string().nullable(),
+	updatedAt: z.string().nullable(),
+	active: z.boolean().optional(),
+	closed: z.boolean().optional(),
+	acceptingOrders: z.boolean().optional(),
+	outcomePrices: z.string().nullable().optional(),
+	bestBid: z.number().nullable().optional(),
+	bestAsk: z.number().nullable().optional(),
+	lastTradePrice: z.number().nullable().optional(),
+	volumeNum: z.number().nullable().optional(),
+	liquidityNum: z.number().nullable().optional(),
 });
 
 const gammaEventSchema = z.object({
 	id: z.string(),
+	slug: z.string().nullable(),
+	title: z.string().nullable(),
+	updatedAt: z.string().nullable(),
+	endDate: z.string().nullable(),
+	eventDate: z.string().nullable().optional(),
+	startTime: z.string().nullable().optional(),
+	tags: z.array(gammaTagSchema).default([]),
 	markets: z.array(gammaMarketSchema).default([]),
 });
 
 export type GammaMarket = z.infer<typeof gammaMarketSchema>;
+export type GammaEvent = z.infer<typeof gammaEventSchema>;
 
 const PAGE_SIZE = 100;
 
-export async function fetchAllActiveMarketsByTagId(
+export async function fetchAllActiveEventsByTagId(
 	tagId: string
-): Promise<GammaMarket[]> {
-	const markets: GammaMarket[] = [];
+): Promise<GammaEvent[]> {
+	const events: GammaEvent[] = [];
 	let offset = 0;
 
 	while (true) {
@@ -42,14 +70,20 @@ export async function fetchAllActiveMarketsByTagId(
 		const json = await response.json();
 		const page = z.array(gammaEventSchema).parse(json);
 
-		for (const event of page) {
-			markets.push(...event.markets);
-		}
+		events.push(...page);
 
 		if (page.length < PAGE_SIZE) {
-			return markets;
+			return events;
 		}
 
 		offset += PAGE_SIZE;
 	}
+}
+
+export async function fetchAllActiveMarketsByTagId(
+	tagId: string
+): Promise<GammaMarket[]> {
+	const events = await fetchAllActiveEventsByTagId(tagId);
+
+	return events.flatMap((event) => event.markets);
 }
