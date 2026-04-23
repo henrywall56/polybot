@@ -6,6 +6,9 @@
 - Prefer the smallest amount of code that solves the current problem.
 - Do not add abstractions before they are needed.
 - Explain new Bun, TypeScript, or Zod concepts briefly when they first appear.
+- Update `DOCS.md` whenever making a large feature, architecture change, or durable technical decision.
+- Update this file when the user gives a reusable repo workflow preference, such as adding a testing framework or changing how future agents should work.
+- Include appropriate tests with each implementation step, or explicitly explain why tests were not added.
 
 ## Project Conventions
 
