@@ -1,0 +1,65 @@
+import type {
+	GammaEvent,
+	GammaMarket,
+	TemperatureMarket,
+} from "../gamma/markets.ts";
+
+export interface TemperatureMarketRecord {
+	event: GammaEvent;
+	market: TemperatureMarket;
+	rawMarket: GammaMarket;
+}
+
+export interface GroupedEvent {
+	event: GammaEvent;
+	records: TemperatureMarketRecord[];
+}
+
+export interface GroupedCity {
+	city: string;
+	events: GroupedEvent[];
+}
+
+export function groupByCity(records: TemperatureMarketRecord[]): GroupedCity[] {
+	const cityMap = new Map<string, Map<string, GroupedEvent>>();
+
+	for (const record of records) {
+		const city = record.market.city ?? "Unknown";
+		const eventGroups = cityMap.get(city) ?? new Map<string, GroupedEvent>();
+		const existing = eventGroups.get(record.event.id) ?? {
+			event: record.event,
+			records: [],
+		};
+
+		existing.records.push(record);
+		eventGroups.set(record.event.id, existing);
+		cityMap.set(city, eventGroups);
+	}
+
+	return [...cityMap.entries()]
+		.map(([city, eventGroups]) => ({
+			city,
+			events: [...eventGroups.values()],
+		}))
+		.sort((left, right) => left.city.localeCompare(right.city));
+}
+
+export function renderTemperatureRange(market: TemperatureMarket): string {
+	if (market.temperatureMin == null && market.temperatureMax == null) {
+		return market.marketTitle ?? market.marketId;
+	}
+
+	if (market.temperatureMin == null) {
+		return `${market.temperatureMax}${market.unit ?? ""} or below`;
+	}
+
+	if (market.temperatureMax == null) {
+		return `${market.temperatureMin}${market.unit ?? ""} or higher`;
+	}
+
+	if (market.temperatureMin === market.temperatureMax) {
+		return `${market.temperatureMin}${market.unit ?? ""}`;
+	}
+
+	return `${market.temperatureMin}-${market.temperatureMax}${market.unit ?? ""}`;
+}

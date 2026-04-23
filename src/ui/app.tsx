@@ -6,23 +6,8 @@ import type {
 	TemperatureMarket,
 } from "../gamma/markets.ts";
 import type { TemperatureMarketSnapshot } from "../gamma/store.ts";
+import { groupByCity, renderTemperatureRange } from "./view-model.ts";
 import "./styles.css";
-
-interface TemperatureMarketRecord {
-	event: GammaEvent;
-	market: TemperatureMarket;
-	rawMarket: GammaMarket;
-}
-
-interface GroupedEvent {
-	event: GammaEvent;
-	records: TemperatureMarketRecord[];
-}
-
-interface GroupedCity {
-	city: string;
-	events: GroupedEvent[];
-}
 
 type ApiSnapshot = Omit<TemperatureMarketSnapshot, "records"> & {
 	records: Array<{
@@ -40,30 +25,6 @@ async function fetchSnapshot(): Promise<ApiSnapshot> {
 	}
 
 	return response.json();
-}
-
-function groupByCity(records: TemperatureMarketRecord[]): GroupedCity[] {
-	const cityMap = new Map<string, Map<string, GroupedEvent>>();
-
-	for (const record of records) {
-		const city = record.market.city ?? "Unknown";
-		const eventGroups = cityMap.get(city) ?? new Map<string, GroupedEvent>();
-		const existing = eventGroups.get(record.event.id) ?? {
-			event: record.event,
-			records: [],
-		};
-
-		existing.records.push(record);
-		eventGroups.set(record.event.id, existing);
-		cityMap.set(city, eventGroups);
-	}
-
-	return [...cityMap.entries()]
-		.map(([city, eventGroups]) => ({
-			city,
-			events: [...eventGroups.values()],
-		}))
-		.sort((left, right) => left.city.localeCompare(right.city));
 }
 
 function renderValue(value: unknown): string {
@@ -186,26 +147,6 @@ function App() {
 			</section>
 		</main>
 	);
-}
-
-function renderTemperatureRange(market: TemperatureMarket): string {
-	if (market.temperatureMin == null && market.temperatureMax == null) {
-		return market.marketTitle ?? market.marketId;
-	}
-
-	if (market.temperatureMin == null) {
-		return `${market.temperatureMax}${market.unit ?? ""} or below`;
-	}
-
-	if (market.temperatureMax == null) {
-		return `${market.temperatureMin}${market.unit ?? ""} or higher`;
-	}
-
-	if (market.temperatureMin === market.temperatureMax) {
-		return `${market.temperatureMin}${market.unit ?? ""}`;
-	}
-
-	return `${market.temperatureMin}-${market.temperatureMax}${market.unit ?? ""}`;
 }
 
 const root = document.getElementById("root");
