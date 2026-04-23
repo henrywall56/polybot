@@ -1,0 +1,101 @@
+:root {
+	font-family:
+		"Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
+	color: #13211a;
+	background: radial-gradient(
+		circle at top,
+		#f6f2e8 0%,
+		#efe7d8 42%,
+		#e0d4be 100%
+	);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+}
+
+.page {
+	max-width: 1100px;
+	padding: 32px 20px 48px;
+	margin: 0 auto;
+}
+
+.page-header {
+	margin-bottom: 24px;
+}
+
+.page-header h1 {
+	margin: 0 0 8px;
+	font-size: clamp(2rem, 4vw, 3.25rem);
+	line-height: 1;
+}
+
+.page-header p {
+	margin: 4px 0;
+}
+
+.summary {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 12px;
+	margin-bottom: 24px;
+}
+
+.summary div,
+.group-card,
+.event-card,
+.market-card,
+pre {
+	background: rgba(255, 251, 244, 0.85);
+	border: 1px solid rgba(19, 33, 26, 0.15);
+	border-radius: 14px;
+}
+
+.summary div {
+	padding: 12px 14px;
+}
+
+.group-list {
+	display: grid;
+	gap: 14px;
+}
+
+details > summary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 14px 16px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.group-content {
+	display: grid;
+	gap: 12px;
+	padding: 0 16px 16px;
+}
+
+pre {
+	padding: 12px;
+	margin: 8px 0 0;
+	overflow-x: auto;
+	font-size: 0.85rem;
+	line-height: 1.45;
+}
+
+.error {
+	font-weight: 700;
+	color: #8d251c;
+}
+
+@media (max-width: 720px) {
+	details > summary {
+		flex-direction: column;
+		gap: 4px;
+		align-items: flex-start;
+	}
+}

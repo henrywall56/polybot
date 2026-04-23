@@ -1,6 +1,7 @@
 import { env } from "./config/env.ts";
 import { startTemperatureMarketPolling } from "./gamma/poller.ts";
 import { getTemperatureMarketSnapshot } from "./gamma/store.ts";
+import ui from "./ui/index.html";
 
 console.log("polybot booted");
 console.log(`Gamma API base URL: ${env.POLYMARKET_GAMMA_BASE_URL}`);
@@ -9,6 +10,7 @@ await startTemperatureMarketPolling();
 
 const server = Bun.serve({
 	routes: {
+		"/": ui,
 		"/api/temperature-markets": () =>
 			Response.json(getTemperatureMarketSnapshot()),
 	},
