@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import PlotComponent from "react-plotly.js";
 import type {
@@ -42,6 +42,32 @@ async function fetchSnapshot(): Promise<ApiSnapshot> {
 
 function renderValue(value: unknown): string {
 	return JSON.stringify(value, null, 2);
+}
+
+function LazyDetails({
+	children,
+	className,
+	summary,
+}: {
+	children: () => ReactNode;
+	className?: string;
+	summary: ReactNode;
+}) {
+	const [hasOpened, setHasOpened] = useState(false);
+
+	return (
+		<details
+			className={className}
+			onToggle={(event) => {
+				if (event.currentTarget.open) {
+					setHasOpened(true);
+				}
+			}}
+		>
+			<summary>{summary}</summary>
+			{hasOpened ? children() : null}
+		</details>
+	);
 }
 
 function ProbabilityGraph({
@@ -136,8 +162,14 @@ function App() {
 
 	useEffect(() => {
 		let cancelled = false;
+		let isLoading = false;
 
 		const load = () => {
+			if (isLoading) {
+				return;
+			}
+
+			isLoading = true;
 			fetchSnapshot()
 				.then((nextSnapshot) => {
 					if (!cancelled) {
@@ -153,6 +185,9 @@ function App() {
 								: "Unknown UI fetch error"
 						);
 					}
+				})
+				.finally(() => {
+					isLoading = false;
 				});
 		};
 
@@ -165,7 +200,10 @@ function App() {
 		};
 	}, []);
 
-	const groupedCities = groupByCity(snapshot?.records ?? []);
+	const groupedCities = useMemo(
+		() => groupByCity(snapshot?.records ?? []),
+		[snapshot?.records]
+	);
 	const probabilityHistoryByMarketId =
 		snapshot?.probabilityHistoryByMarketId ?? {};
 
@@ -193,66 +231,85 @@ function App() {
 
 			<section className="group-list">
 				{groupedCities.map((cityGroup) => (
-					<details className="group-card" key={cityGroup.city}>
-						<summary>
-							<span>{cityGroup.city}</span>
-							<span>{cityGroup.events.length} events</span>
-						</summary>
-
-						<div className="group-content">
-							{cityGroup.events.map((eventGroup) => (
-								<details className="event-card" key={eventGroup.event.id}>
-									<summary>
-										<span>{eventGroup.event.title ?? eventGroup.event.id}</span>
-										<span>{eventGroup.records.length} markets</span>
-									</summary>
-
-									<div className="group-content">
-										{eventGroup.records.map((record) => (
-											<details
-												className="market-card"
-												key={record.market.marketId}
-											>
-												<summary>
-													<span>{renderTemperatureRange(record.market)}</span>
-													<span>
-														{record.market.temperatureKind ?? "unknown"} /{" "}
-														{record.market.unit ?? "?"}
-													</span>
-												</summary>
-
-												<div className="group-content">
-													<ProbabilityGraph
-														history={
-															probabilityHistoryByMarketId[
-																record.market.marketId
-															] ?? []
+					<LazyDetails
+						className="group-card"
+						key={cityGroup.city}
+						summary={
+							<>
+								<span>{cityGroup.city}</span>
+								<span>{cityGroup.events.length} events</span>
+							</>
+						}
+					>
+						{() => (
+							<div className="group-content">
+								{cityGroup.events.map((eventGroup) => (
+									<LazyDetails
+										className="event-card"
+										key={eventGroup.event.id}
+										summary={
+											<>
+												<span>
+													{eventGroup.event.title ?? eventGroup.event.id}
+												</span>
+												<span>{eventGroup.records.length} markets</span>
+											</>
+										}
+									>
+										{() => (
+											<div className="group-content">
+												{eventGroup.records.map((record) => (
+													<LazyDetails
+														className="market-card"
+														key={record.market.marketId}
+														summary={
+															<>
+																<span>
+																	{renderTemperatureRange(record.market)}
+																</span>
+																<span>
+																	{record.market.temperatureKind ?? "unknown"} /{" "}
+																	{record.market.unit ?? "?"}
+																</span>
+															</>
 														}
-														marketTitle={record.market.marketTitle}
-													/>
+													>
+														{() => (
+															<div className="group-content">
+																<ProbabilityGraph
+																	history={
+																		probabilityHistoryByMarketId[
+																			record.market.marketId
+																		] ?? []
+																	}
+																	marketTitle={record.market.marketTitle}
+																/>
 
-													<details open>
-														<summary>Mapped fields</summary>
-														<pre>{renderValue(record.market)}</pre>
-													</details>
+																<details open>
+																	<summary>Mapped fields</summary>
+																	<pre>{renderValue(record.market)}</pre>
+																</details>
 
-													<details>
-														<summary>Raw event</summary>
-														<pre>{renderValue(record.event)}</pre>
-													</details>
+																<details>
+																	<summary>Raw event</summary>
+																	<pre>{renderValue(record.event)}</pre>
+																</details>
 
-													<details>
-														<summary>Raw market</summary>
-														<pre>{renderValue(record.rawMarket)}</pre>
-													</details>
-												</div>
-											</details>
-										))}
-									</div>
-								</details>
-							))}
-						</div>
-					</details>
+																<details>
+																	<summary>Raw market</summary>
+																	<pre>{renderValue(record.rawMarket)}</pre>
+																</details>
+															</div>
+														)}
+													</LazyDetails>
+												))}
+											</div>
+										)}
+									</LazyDetails>
+								))}
+							</div>
+						)}
+					</LazyDetails>
 				))}
 			</section>
 		</main>

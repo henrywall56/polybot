@@ -19,6 +19,7 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 	console.log(`Resolved Gamma tag "${TEMPERATURE_TAG_SLUG}" to id ${tag.id}`);
 
 	let isRunning = false;
+	let lastLoggedMarketCount: number | null = null;
 
 	const runCycle = async (): Promise<void> => {
 		if (isRunning) {
@@ -63,9 +64,12 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 				updatedAt,
 			});
 
-			console.log(
-				`Gamma poll fetched ${markets.length} markets in ${elapsedMs}ms`
-			);
+			if (markets.length !== lastLoggedMarketCount) {
+				console.log(
+					`Gamma poll tracking ${markets.length} markets; latest cycle took ${elapsedMs}ms`
+				);
+				lastLoggedMarketCount = markets.length;
+			}
 		} catch (error) {
 			setTemperatureMarketSnapshot({
 				error: error instanceof Error ? error.message : String(error),
