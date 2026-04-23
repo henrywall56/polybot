@@ -7,12 +7,18 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun --watch run src/index.ts",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "lint": "ultracite check",
+    "lint:fix": "ultracite fix",
+    "prepare": "husky"
   },
   "dependencies": {
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "@biomejs/biome": "^2.4.12",
+    "husky": "^9.1.7",
+    "typescript": "^5.9.3",
+    "ultracite": "^7.6.1"
   }
 }
