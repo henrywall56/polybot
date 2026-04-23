@@ -8,6 +8,7 @@
     "start": "bun run src/index.ts",
     "dev": "bun --watch run src/index.ts",
     "check": "tsc --noEmit",
+    "test": "bun test",
     "lint": "ultracite check",
     "lint:fix": "ultracite fix",
     "prepare": "husky"

@@ -1,0 +1,87 @@
+import type { GammaEvent } from "../../src/gamma/markets.ts";
+
+export const temperatureEventsFixture: GammaEvent[] = [
+	{
+		id: "event-1",
+		slug: "highest-temperature-in-seattle-on-april-22-2026",
+		title: "Highest temperature in Seattle on April 22?",
+		updatedAt: "2026-04-23T08:29:07.316838Z",
+		endDate: "2026-04-22T12:00:00Z",
+		eventDate: "2026-04-22",
+		startTime: "2026-04-20T04:04:00.165Z",
+		tags: [
+			{ id: "84", slug: "weather", label: "Weather" },
+			{
+				id: "103040",
+				slug: "daily-temperature",
+				label: "Daily Temperature",
+			},
+			{ id: "102431", slug: "seattle", label: "Seattle" },
+			{
+				id: "104596",
+				slug: "highest-temperature",
+				label: "Highest temperature",
+			},
+		],
+		markets: [
+			{
+				id: "market-1",
+				slug: "highest-temperature-in-seattle-on-april-22-2026-57forbelow",
+				question:
+					"Will the highest temperature in Seattle be 57°F or below on April 22?",
+				groupItemTitle: "57°F or below",
+				groupItemThreshold: "0",
+				endDate: "2026-04-22T12:00:00Z",
+				startDate: "2026-04-20T04:25:18.733258Z",
+				updatedAt: "2026-04-23T08:29:33.60825Z",
+				active: true,
+				closed: false,
+				acceptingOrders: true,
+				outcomePrices: '["0.9995", "0.0005"]',
+				bestBid: 0.999,
+				bestAsk: 1,
+				lastTradePrice: 0.999,
+				volumeNum: 12_854.982_708_999_993,
+				liquidityNum: 69_868.160_14,
+			},
+		],
+	},
+	{
+		id: "event-2",
+		slug: "lowest-temperature-in-berlin-on-april-23-2026",
+		title: "Lowest temperature in Berlin on April 23?",
+		updatedAt: "2026-04-23T09:10:00.000Z",
+		endDate: "2026-04-23T12:00:00Z",
+		eventDate: null,
+		startTime: "2026-04-21T04:04:00.165Z",
+		tags: [
+			{ id: "84", slug: "weather", label: "Weather" },
+			{
+				id: "103040",
+				slug: "daily-temperature",
+				label: "Daily Temperature",
+			},
+		],
+		markets: [
+			{
+				id: "market-2",
+				slug: "lowest-temperature-in-berlin-on-april-23-2026-3-4c",
+				question: "Will the lowest temperature in Berlin be 3-4°C on April 23?",
+				groupItemTitle: "3-4°C",
+				groupItemThreshold: "2",
+				endDate: "2026-04-23T12:00:00Z",
+				startDate: "2026-04-21T04:25:18.733258Z",
+				updatedAt: "2026-04-23T09:11:00.000Z",
+				active: true,
+				closed: false,
+				acceptingOrders: false,
+				outcomePrices: '["0.4", "0.6"]',
+				bestBid: 0.39,
+				bestAsk: 0.41,
+				lastTradePrice: 0.4,
+				volumeNum: 500,
+				liquidityNum: 1500,
+			},
+		],
+	},
+];
