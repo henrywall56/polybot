@@ -5,7 +5,6 @@ Small TypeScript/Bun project for exploring Polymarket trading ideas with externa
 Initial focus:
 - read market data from the Polymarket Gamma API
 - compare implied probabilities against fresher weather data
-- keep the codebase small and easy to change
 
 ## Setup
 
