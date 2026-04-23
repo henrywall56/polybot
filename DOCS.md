@@ -9,7 +9,7 @@ Polybot is a small Bun and TypeScript app for exploring Polymarket weather marke
 - **Zod** is used for runtime validation of environment variables and external API responses. This keeps failures early and explicit when Gamma changes shape or local config is missing.
 - **React** powers the browser UI. It is bundled by Bun from `src/ui/index.html` and `src/ui/app.tsx`.
 - **Plotly** powers the implied-probability graphs. The UI uses `react-plotly.js` with `plotly.js`.
-- **No database yet.** Market snapshots and probability history are in memory only, so they reset when the Bun process restarts.
+- **No database yet.** Market snapshots, probability history, city/station matches, and weather snapshots are in memory only, so they reset when the Bun process restarts.
 
 ## Runtime Flow
 
@@ -21,6 +21,12 @@ Polybot is a small Bun and TypeScript app for exploring Polymarket weather marke
 The only required environment variable today is:
 
 - `POLYMARKET_GAMMA_BASE_URL`, validated as a URL in `src/config/env.ts`.
+
+Weather-related environment values also live in `src/config/env.ts` and have defaults:
+
+- `AVIATION_WEATHER_BASE_URL`, defaulting to `https://aviationweather.gov/api/data`.
+- `OPEN_METEO_GEOCODING_BASE_URL`, defaulting to `https://geocoding-api.open-meteo.com/v1`.
+- `APP_USER_AGENT`, sent with external weather requests.
 
 ## Gamma API Access
 
@@ -89,6 +95,46 @@ The snapshot exposes this as:
 probabilityHistoryByMarketId: Record<string, MarketProbabilityPoint[]>
 ```
 
+## Weather Edge Layer
+
+The `src/weather` module enriches daily temperature markets with free public aviation/weather data.
+
+Data sources:
+
+- Open-Meteo Geocoding API converts a Gamma-derived market city into coordinates.
+- NOAA Aviation Weather Center station metadata locates nearby aviation weather stations.
+- NOAA Aviation Weather Center METAR observations provide the latest observed station temperature.
+- NOAA Aviation Weather Center TAF forecasts provide terminal forecast context when the matched station publishes TAFs.
+
+City and station matching:
+
+1. The weather poller reads the current normalized Gamma markets from the in-memory snapshot.
+2. Each unique city is geocoded once per process and cached.
+3. The app queries AWC `stationinfo` with expanding bounding boxes around the city coordinates.
+4. It selects the nearest station with a `METAR` site type.
+5. The selected station records id, name, coordinates, distance, confidence, and whether the station has TAF data.
+
+Weather polling is separate from Gamma polling:
+
+- Gamma markets still poll every 5 seconds.
+- METAR data polls around every 60 seconds.
+- TAF data polls around every 10 minutes.
+- Geocoding and station matching are cached for the Bun process.
+
+Weather snapshots are stored by market id:
+
+```ts
+weatherByMarketId: Record<string, MarketWeatherSnapshot>
+```
+
+`MarketWeatherSnapshot` normalizes the external data into:
+
+- `stationMatch`: station id, station name, coordinates, distance, confidence, and TAF availability.
+- `metar`: observed temperature in Celsius, observation time, and raw METAR text.
+- `taf`: issue time and raw TAF text.
+- `comparison`: whether the observed temperature is below, inside, or above the market's temperature band.
+- `error`: a per-market weather error/status so Gamma data remains usable if weather data is missing.
+
 ## React UI
 
 The UI polls `/api/temperature-markets` every 5 seconds, matching the backend Gamma polling cadence.
@@ -103,6 +149,7 @@ The UI uses nested `<details>` sections. Expensive market detail content is lazy
 
 Each opened market shows:
 
+- A lazy-loaded Weather edge panel with station match, latest METAR, TAF context, and observed-temperature band comparison.
 - A Plotly implied Yes probability graph.
 - Horizon controls: `1m`, `2m`, `3m`, `4m`, `5m`, `All retained`.
 - Mapped internal fields.
@@ -124,63 +171,31 @@ Existing tests cover:
 
 - Gamma market normalization.
 - Implied probability parsing and rolling retention.
+- Weather API parsing, no-data behavior, geocoding parsing, station matching, distance calculation, and temperature-band comparison.
 - UI grouping, range rendering, graph horizon filtering, percent conversion, and empty graph series behavior.
 
 ## Current Data Sources
 
-Current live data source:
+Current live data sources:
 
 - Polymarket Gamma API for active daily temperature events and markets.
+- Open-Meteo Geocoding API for city coordinates.
+- NOAA Aviation Weather Center Data API for METAR, TAF, and station metadata.
 
 Current city location strategy:
 
 - City names are derived from Gamma tags or event titles.
-- The app does not yet geocode cities or map them to weather stations.
+- City names are geocoded with Open-Meteo.
+- Geocoded coordinates are mapped to the nearest METAR-capable AWC station.
 
 Current polling:
 
 - Gamma daily temperature markets: every 5 seconds.
 - UI snapshot refresh: every 5 seconds.
 - Implied probability history: recorded once per successful Gamma poll.
+- METAR observations: around every 60 seconds.
+- TAF forecasts: around every 10 minutes.
 
-## Next Planned Weather Edge Layer
+## Next Planned Edge Work
 
-The next implementation step is to add an aviation/weather data layer for daily temperature markets.
-
-Planned v1 scope:
-
-- Use free public feeds.
-- Keep the feature display-only; no trade recommendations yet.
-- Add a lazy-loaded "Weather edge" panel inside each opened market.
-
-Planned data sources:
-
-- NOAA Aviation Weather Center Data API for METAR observations and TAF forecasts.
-- Open-Meteo Geocoding API to convert market city names into coordinates.
-- AWC station metadata to map city coordinates to the nearest aviation weather station.
-
-Planned polling:
-
-- METAR: around once per minute.
-- TAF: around every 10 minutes.
-- Geocoding and station metadata: cached in memory for the process.
-
-Planned API addition:
-
-```ts
-weatherByMarketId: Record<string, MarketWeatherSnapshot>
-```
-
-Planned normalized weather fields:
-
-- Station match: station id, name, coordinates, distance, confidence/status.
-- METAR: observed temperature, observation time, raw report if available.
-- TAF: forecast summary/raw report if available.
-- Market comparison: below band, inside band, above band, or unavailable.
-- Error/status fields per market so Gamma data remains usable if weather fetches fail.
-
-Suggested commit message for that future work:
-
-```text
-weather: add aviation data edge panel
-```
+The weather panel is display-only. The next likely step is to turn the weather evidence into a simple market-facing signal, such as highlighting markets where observed temperatures are already outside a band, or adding model forecast data to compare against market-implied probabilities.

@@ -3,8 +3,11 @@ import { mapTemperatureMarkets } from "../../src/gamma/markets.ts";
 import {
 	buildProbabilityGraphSeries,
 	filterProbabilityHistory,
+	formatDistanceKm,
+	formatTemperatureCelsius,
 	groupByCity,
 	renderTemperatureRange,
+	renderWeatherComparison,
 	type TemperatureMarketRecord,
 } from "../../src/ui/view-model.ts";
 import { temperatureEventsFixture } from "../fixtures/temperature-events.ts";
@@ -113,5 +116,15 @@ describe("UI view model", () => {
 			percentValues: [],
 			timestamps: [],
 		});
+	});
+
+	test("formats weather edge display values", () => {
+		expect(formatDistanceKm(18.234)).toBe("18.2 km");
+		expect(formatTemperatureCelsius(7.78)).toBe("7.8C");
+		expect(formatTemperatureCelsius(null)).toBe("Unavailable");
+		expect(renderWeatherComparison("above-band")).toBe("Above market band");
+		expect(renderWeatherComparison("below-band")).toBe("Below market band");
+		expect(renderWeatherComparison("inside-band")).toBe("Inside market band");
+		expect(renderWeatherComparison("unavailable")).toBe("Unavailable");
 	});
 });

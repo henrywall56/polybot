@@ -1,3 +1,4 @@
+import type { MarketWeatherSnapshot } from "../weather/types.ts";
 import type { GammaEvent, TemperatureMarket } from "./markets.ts";
 import type { MarketProbabilityPoint } from "./probability-history.ts";
 
@@ -14,6 +15,7 @@ export interface TemperatureMarketSnapshot {
 	probabilityHistoryByMarketId: Record<string, MarketProbabilityPoint[]>;
 	records: TemperatureMarketRecord[];
 	updatedAt: string | null;
+	weatherByMarketId: Record<string, MarketWeatherSnapshot>;
 }
 
 const temperatureMarketSnapshot: TemperatureMarketSnapshot = {
@@ -23,6 +25,7 @@ const temperatureMarketSnapshot: TemperatureMarketSnapshot = {
 	probabilityHistoryByMarketId: {},
 	records: [],
 	updatedAt: null,
+	weatherByMarketId: {},
 };
 
 export function getTemperatureMarketSnapshot(): TemperatureMarketSnapshot {
@@ -39,4 +42,11 @@ export function setTemperatureMarketSnapshot(
 		snapshot.probabilityHistoryByMarketId;
 	temperatureMarketSnapshot.records = snapshot.records;
 	temperatureMarketSnapshot.updatedAt = snapshot.updatedAt;
+	temperatureMarketSnapshot.weatherByMarketId = snapshot.weatherByMarketId;
+}
+
+export function setTemperatureMarketWeather(
+	weatherByMarketId: Record<string, MarketWeatherSnapshot>
+): void {
+	temperatureMarketSnapshot.weatherByMarketId = weatherByMarketId;
 }

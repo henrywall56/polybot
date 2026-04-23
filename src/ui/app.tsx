@@ -8,13 +8,17 @@ import type {
 } from "../gamma/markets.ts";
 import type { MarketProbabilityPoint } from "../gamma/probability-history.ts";
 import type { TemperatureMarketSnapshot } from "../gamma/store.ts";
+import type { MarketWeatherSnapshot } from "../weather/types.ts";
 import {
 	buildProbabilityGraphSeries,
 	filterProbabilityHistory,
+	formatDistanceKm,
+	formatTemperatureCelsius,
 	groupByCity,
 	type ProbabilityGraphHorizon,
 	probabilityGraphHorizons,
 	renderTemperatureRange,
+	renderWeatherComparison,
 } from "./view-model.ts";
 import "./styles.css";
 
@@ -156,6 +160,85 @@ function ProbabilityGraph({
 	);
 }
 
+function WeatherEdgePanel({
+	weather,
+}: {
+	weather: MarketWeatherSnapshot | null;
+}) {
+	if (!weather) {
+		return (
+			<section className="weather-panel">
+				<h3>Weather edge</h3>
+				<p className="empty-state">
+					No weather data loaded for this market yet.
+				</p>
+			</section>
+		);
+	}
+
+	return (
+		<section className="weather-panel">
+			<div className="weather-panel-header">
+				<h3>Weather edge</h3>
+				<span>{renderWeatherComparison(weather.comparison)}</span>
+			</div>
+
+			{weather.error ? <p className="error">{weather.error}</p> : null}
+
+			<div className="weather-grid">
+				<div>
+					<strong>Station</strong>
+					<span>
+						{weather.stationMatch
+							? `${weather.stationMatch.stationId} - ${
+									weather.stationMatch.name ?? "Unknown"
+								}`
+							: "Unavailable"}
+					</span>
+				</div>
+				<div>
+					<strong>Distance</strong>
+					<span>
+						{weather.stationMatch
+							? `${formatDistanceKm(weather.stationMatch.distanceKm)} (${
+									weather.stationMatch.confidence
+								})`
+							: "Unavailable"}
+					</span>
+				</div>
+				<div>
+					<strong>Observed temp</strong>
+					<span>
+						{formatTemperatureCelsius(weather.metar?.temperatureC ?? null)}
+					</span>
+				</div>
+				<div>
+					<strong>Observed at</strong>
+					<span>{weather.metar?.observationTime ?? "Unavailable"}</span>
+				</div>
+				<div>
+					<strong>TAF issued</strong>
+					<span>{weather.taf?.issueTime ?? "Unavailable"}</span>
+				</div>
+				<div>
+					<strong>Weather updated</strong>
+					<span>{weather.updatedAt ?? "Unavailable"}</span>
+				</div>
+			</div>
+
+			<details>
+				<summary>Raw METAR</summary>
+				<pre>{weather.metar?.rawText ?? "Unavailable"}</pre>
+			</details>
+
+			<details>
+				<summary>Raw TAF</summary>
+				<pre>{weather.taf?.rawText ?? "Unavailable"}</pre>
+			</details>
+		</section>
+	);
+}
+
 function App() {
 	const [snapshot, setSnapshot] = useState<ApiSnapshot | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -206,6 +289,7 @@ function App() {
 	);
 	const probabilityHistoryByMarketId =
 		snapshot?.probabilityHistoryByMarketId ?? {};
+	const weatherByMarketId = snapshot?.weatherByMarketId ?? {};
 
 	return (
 		<main className="page">
@@ -276,6 +360,13 @@ function App() {
 													>
 														{() => (
 															<div className="group-content">
+																<WeatherEdgePanel
+																	weather={
+																		weatherByMarketId[record.market.marketId] ??
+																		null
+																	}
+																/>
+
 																<ProbabilityGraph
 																	history={
 																		probabilityHistoryByMarketId[

@@ -96,6 +96,55 @@ pre {
 	border-radius: 8px;
 }
 
+.weather-panel {
+	display: grid;
+	gap: 12px;
+	padding: 12px;
+	background: rgba(248, 250, 246, 0.78);
+	border: 1px solid rgba(19, 33, 26, 0.15);
+	border-radius: 8px;
+}
+
+.weather-panel h3 {
+	margin: 0;
+	font-size: 1rem;
+}
+
+.weather-panel-header {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.weather-panel-header span {
+	padding: 4px 8px;
+	font-weight: 700;
+	color: #fffdf8;
+	background: #365f87;
+	border-radius: 6px;
+}
+
+.weather-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+	gap: 10px;
+}
+
+.weather-grid div {
+	display: grid;
+	gap: 4px;
+	padding: 10px;
+	background: rgba(255, 251, 244, 0.72);
+	border: 1px solid rgba(19, 33, 26, 0.12);
+	border-radius: 6px;
+}
+
+.weather-grid span {
+	overflow-wrap: anywhere;
+}
+
 .probability-toolbar {
 	display: flex;
 	flex-wrap: wrap;

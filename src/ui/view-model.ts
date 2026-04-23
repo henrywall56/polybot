@@ -4,6 +4,7 @@ import type {
 	TemperatureMarket,
 } from "../gamma/markets.ts";
 import type { MarketProbabilityPoint } from "../gamma/probability-history.ts";
+import type { MarketWeatherSnapshot } from "../weather/types.ts";
 
 export interface TemperatureMarketRecord {
 	event: GammaEvent;
@@ -44,6 +45,35 @@ export const probabilityGraphHorizons: Array<{
 export interface ProbabilityGraphSeries {
 	percentValues: number[];
 	timestamps: string[];
+}
+
+export function formatDistanceKm(distanceKm: number): string {
+	return `${distanceKm.toFixed(1)} km`;
+}
+
+export function formatTemperatureCelsius(temperatureC: number | null): string {
+	if (temperatureC == null) {
+		return "Unavailable";
+	}
+
+	return `${temperatureC.toFixed(1)}C`;
+}
+
+export function renderWeatherComparison(
+	comparison: MarketWeatherSnapshot["comparison"]
+): string {
+	switch (comparison) {
+		case "above-band":
+			return "Above market band";
+		case "below-band":
+			return "Below market band";
+		case "inside-band":
+			return "Inside market band";
+		case "unavailable":
+			return "Unavailable";
+		default:
+			return "Unavailable";
+	}
 }
 
 export function groupByCity(records: TemperatureMarketRecord[]): GroupedCity[] {

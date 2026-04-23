@@ -7,7 +7,10 @@ import {
 	getProbabilityHistoryByMarketId,
 	recordMarketProbabilityHistory,
 } from "./probability-history.ts";
-import { setTemperatureMarketSnapshot } from "./store.ts";
+import {
+	getTemperatureMarketSnapshot,
+	setTemperatureMarketSnapshot,
+} from "./store.ts";
 import { fetchTagBySlug } from "./tags.ts";
 
 const POLL_INTERVAL_MS = 5000;
@@ -62,6 +65,7 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 				probabilityHistoryByMarketId: getProbabilityHistoryByMarketId(),
 				records,
 				updatedAt,
+				weatherByMarketId: getTemperatureMarketSnapshot().weatherByMarketId,
 			});
 
 			if (markets.length !== lastLoggedMarketCount) {
@@ -78,6 +82,7 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 				probabilityHistoryByMarketId: getProbabilityHistoryByMarketId(),
 				records: [],
 				updatedAt: null,
+				weatherByMarketId: getTemperatureMarketSnapshot().weatherByMarketId,
 			});
 			console.error("Gamma poll failed:", error);
 		} finally {
