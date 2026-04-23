@@ -49,10 +49,36 @@ describe("mapTemperatureMarkets", () => {
 	test("maps all markets from all events into a flat internal list", () => {
 		const markets = mapTemperatureMarkets(temperatureEventsFixture);
 
-		expect(markets).toHaveLength(2);
+		expect(markets).toHaveLength(4);
 		expect(markets.map((market) => market.marketId)).toEqual([
 			"market-1",
 			"market-2",
+			"market-3",
+			"market-4",
 		]);
+	});
+
+	test("keeps the grouped market ordering field for or-higher bands", () => {
+		const [market] = mapTemperatureMarkets([temperatureEventsFixture[2]]);
+
+		expect(market.city).toBe("Los Angeles");
+		expect(market.temperatureKind).toBe("high");
+		expect(market.temperatureBand).toBe("74°F or higher");
+		expect(market.temperatureBandIndex).toBe(10);
+		expect(market.unit).toBe("F");
+	});
+
+	test("returns nulls for fields that cannot be derived safely", () => {
+		const [market] = mapTemperatureMarkets([temperatureEventsFixture[3]]);
+
+		expect(market.city).toBeNull();
+		expect(market.temperatureKind).toBeNull();
+		expect(market.temperatureBand).toBeNull();
+		expect(market.temperatureBandIndex).toBeNull();
+		expect(market.unit).toBeNull();
+		expect(market.marketDate).toBe("2026-04-25T12:00:00Z");
+		expect(market.acceptingOrders).toBeNull();
+		expect(market.bestBid).toBeNull();
+		expect(market.liquidity).toBeNull();
 	});
 });
