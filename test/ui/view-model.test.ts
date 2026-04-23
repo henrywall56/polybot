@@ -101,7 +101,7 @@ describe("UI view model", () => {
 		expect(filterMarketPriceHistory(history, null)).toBe(history);
 	});
 
-	test("builds CLOB dollar price graph values with stable price ranges", () => {
+	test("builds CLOB dollar price graph values and padded ranges", () => {
 		const series = buildMarketPriceGraphSeries([
 			{
 				marketId: "market-1",
@@ -124,13 +124,14 @@ describe("UI view model", () => {
 		expect(series).toMatchObject({
 			noAskValues: [0.02, 0.62],
 			noBidValues: [0.01, 0.6],
-			noYRange: [0, 1],
+			noYRange: [0, 0.6505],
 			timestamps: ["2026-04-23T10:00:00.000Z", "2026-04-23T10:05:00.000Z"],
 			xRange: ["2026-04-23T09:59:45.000Z", "2026-04-23T10:05:15.000Z"],
 			yesAskValues: [0.9995, 0.42],
 			yesBidValues: [0.99, 0.4],
-			yesYRange: [0, 1],
 		});
+		expect(series.yesYRange[0]).toBeCloseTo(0.370_025);
+		expect(series.yesYRange[1]).toBe(1);
 	});
 
 	test("returns empty graph arrays when history is empty", () => {
