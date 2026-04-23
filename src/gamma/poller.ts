@@ -2,6 +2,7 @@ import {
 	fetchAllActiveEventsByTagId,
 	mapTemperatureMarkets,
 } from "./markets.ts";
+import { setTemperatureMarketSnapshot } from "./store.ts";
 import { fetchTagBySlug } from "./tags.ts";
 
 const POLL_INTERVAL_MS = 5000;
@@ -29,6 +30,7 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 		try {
 			const events = await fetchAllActiveEventsByTagId(tag.id);
 			const markets = mapTemperatureMarkets(events);
+			const updatedAt = new Date().toISOString();
 			const sample = markets
 				.slice(0, 3)
 				.map((market) =>
@@ -42,6 +44,13 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 				.join(", ");
 			const elapsedMs = Date.now() - startedAt;
 
+			setTemperatureMarketSnapshot({
+				error: null,
+				events,
+				markets,
+				updatedAt,
+			});
+
 			console.log(
 				`Gamma poll fetched ${markets.length} markets in ${elapsedMs}ms`
 			);
@@ -50,6 +59,12 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 				console.log(`Sample markets: ${sample}`);
 			}
 		} catch (error) {
+			setTemperatureMarketSnapshot({
+				error: error instanceof Error ? error.message : String(error),
+				events: [],
+				markets: [],
+				updatedAt: null,
+			});
 			console.error("Gamma poll failed:", error);
 		} finally {
 			isRunning = false;
