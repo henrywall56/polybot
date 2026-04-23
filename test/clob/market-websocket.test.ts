@@ -200,9 +200,37 @@ describe("CLOB market WebSocket", () => {
 				custom_feature_enabled: true,
 				type: "market",
 			},
-			{ assets_ids: ["new-no-token"], operation: "subscribe" },
+			{
+				assets_ids: ["new-no-token"],
+				custom_feature_enabled: true,
+				operation: "subscribe",
+			},
 			{ assets_ids: ["no-token"], operation: "unsubscribe" },
 		]);
+	});
+
+	test("sends heartbeat pings on an open socket", () => {
+		const sockets: MockWebSocket[] = [];
+		const intervalCallbacks: Array<() => void> = [];
+		const stream = new ClobMarketPriceStream({
+			createWebSocket: () => {
+				const socket = new MockWebSocket();
+				sockets.push(socket);
+				return socket;
+			},
+			onPriceUpdate: noop,
+			setIntervalFn: ((callback: () => void) => {
+				intervalCallbacks.push(callback);
+				return 1;
+			}) as typeof setInterval,
+			url: "wss://example.test/ws",
+		});
+
+		stream.updateAssetIds(["yes-token"]);
+		sockets[0]?.open();
+		intervalCallbacks[0]?.();
+
+		expect(sockets[0]?.sentMessages.at(-1)).toBe("PING");
 	});
 
 	test("requests fallback and reconnects after a close", () => {

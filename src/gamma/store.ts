@@ -1,3 +1,4 @@
+import type { MarketOrderBookSnapshot } from "../clob/order-book.ts";
 import type { MarketWeatherSnapshot } from "../weather/types.ts";
 import type { MarketPricePoint } from "./market-price-history.ts";
 import type { GammaEvent, TemperatureMarket } from "./markets.ts";
@@ -13,7 +14,7 @@ export interface TemperatureMarketSnapshot {
 	events: GammaEvent[];
 	marketPriceHistoryByMarketId: Record<string, MarketPricePoint[]>;
 	markets: TemperatureMarket[];
-	orderBookByMarketId?: Record<string, unknown>;
+	orderBookByMarketId: Record<string, MarketOrderBookSnapshot>;
 	records: TemperatureMarketRecord[];
 	updatedAt: string | null;
 	weatherByMarketId: Record<string, MarketWeatherSnapshot>;
@@ -33,6 +34,7 @@ export interface TemperatureMarketListSnapshot {
 export interface TemperatureMarketDetailSnapshot {
 	event: GammaEvent;
 	market: TemperatureMarket;
+	orderBook: MarketOrderBookSnapshot | null;
 	priceHistory: MarketPricePoint[];
 	rawMarket: GammaEvent["markets"][number];
 	weather: MarketWeatherSnapshot | null;
@@ -43,6 +45,7 @@ const temperatureMarketSnapshot: TemperatureMarketSnapshot = {
 	events: [],
 	marketPriceHistoryByMarketId: {},
 	markets: [],
+	orderBookByMarketId: {},
 	records: [],
 	updatedAt: null,
 	weatherByMarketId: {},
@@ -82,6 +85,7 @@ export function getTemperatureMarketDetailSnapshot(
 	return {
 		event: record.event,
 		market: record.market,
+		orderBook: temperatureMarketSnapshot.orderBookByMarketId[marketId] ?? null,
 		priceHistory:
 			temperatureMarketSnapshot.marketPriceHistoryByMarketId[marketId] ?? [],
 		rawMarket: record.rawMarket,

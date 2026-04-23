@@ -1,3 +1,4 @@
+import type { ClobPriceUpdate } from "../clob/market-websocket.ts";
 import {
 	type ClobPriceRequest,
 	type ClobPricesByTokenId,
@@ -6,6 +7,7 @@ import {
 import type { GammaMarket } from "./markets.ts";
 
 const HISTORY_RETENTION_MS = 60 * 60 * 1000;
+const GRAPH_UPDATE_THROTTLE_MS = 1000;
 
 export interface MarketPricePoint {
 	marketId: string;
@@ -21,7 +23,21 @@ export interface OutcomeTokenIds {
 	yesTokenId: string;
 }
 
+export interface OutcomeTokenMapping {
+	marketId: string;
+	outcome: "No" | "Yes";
+	tokenId: string;
+}
+
+interface LatestMarketQuote {
+	noAsk: number | null;
+	noBid: number | null;
+	yesAsk: number | null;
+	yesBid: number | null;
+}
+
 const priceHistoryByMarketId = new Map<string, MarketPricePoint[]>();
+const latestQuoteByMarketId = new Map<string, LatestMarketQuote>();
 
 export function parseOutcomeTokenIds(
 	outcomes: GammaMarket["outcomes"],
@@ -52,6 +68,37 @@ export function parseOutcomeTokenIds(
 	} catch {
 		return null;
 	}
+}
+
+export function buildOutcomeTokenMappings(
+	markets: GammaMarket[]
+): Map<string, OutcomeTokenMapping> {
+	const mappings = new Map<string, OutcomeTokenMapping>();
+
+	for (const market of markets) {
+		if (market.closed === true || market.acceptingOrders === false) {
+			continue;
+		}
+
+		const tokenIds = parseOutcomeTokenIds(market.outcomes, market.clobTokenIds);
+
+		if (!tokenIds) {
+			continue;
+		}
+
+		mappings.set(tokenIds.yesTokenId, {
+			marketId: market.id,
+			outcome: "Yes",
+			tokenId: tokenIds.yesTokenId,
+		});
+		mappings.set(tokenIds.noTokenId, {
+			marketId: market.id,
+			outcome: "No",
+			tokenId: tokenIds.noTokenId,
+		});
+	}
+
+	return mappings;
 }
 
 export async function recordMarketPriceHistory(
@@ -97,6 +144,73 @@ export async function recordMarketPriceHistory(
 	trimPriceHistory(timestampMs);
 }
 
+export function recordClobPriceUpdate(
+	mapping: OutcomeTokenMapping,
+	update: ClobPriceUpdate,
+	throttleMs = GRAPH_UPDATE_THROTTLE_MS
+): void {
+	const timestampMs = update.timestamp.getTime();
+
+	if (!Number.isFinite(timestampMs)) {
+		return;
+	}
+
+	const bid = parseClobPrice(update.bid ?? undefined);
+	const ask = parseClobPrice(update.ask ?? undefined);
+	const latestQuote = latestQuoteByMarketId.get(mapping.marketId) ?? {
+		noAsk: null,
+		noBid: null,
+		yesAsk: null,
+		yesBid: null,
+	};
+
+	if (mapping.outcome === "Yes") {
+		latestQuote.yesAsk = ask;
+		latestQuote.yesBid = bid;
+	} else {
+		latestQuote.noAsk = ask;
+		latestQuote.noBid = bid;
+	}
+
+	latestQuoteByMarketId.set(mapping.marketId, latestQuote);
+
+	if (
+		latestQuote.yesAsk == null &&
+		latestQuote.yesBid == null &&
+		latestQuote.noAsk == null &&
+		latestQuote.noBid == null
+	) {
+		return;
+	}
+
+	const point: MarketPricePoint = {
+		marketId: mapping.marketId,
+		noAsk: latestQuote.noAsk,
+		noBid: latestQuote.noBid,
+		timestamp: update.timestamp.toISOString(),
+		yesAsk: latestQuote.yesAsk,
+		yesBid: latestQuote.yesBid,
+	};
+	const history = priceHistoryByMarketId.get(mapping.marketId) ?? [];
+	const previousPoint = history.at(-1);
+	const previousTimestampMs = previousPoint
+		? Date.parse(previousPoint.timestamp)
+		: Number.NaN;
+
+	if (
+		Number.isFinite(previousTimestampMs) &&
+		Math.floor(previousTimestampMs / throttleMs) ===
+			Math.floor(timestampMs / throttleMs)
+	) {
+		history[history.length - 1] = point;
+	} else {
+		history.push(point);
+	}
+
+	priceHistoryByMarketId.set(mapping.marketId, history);
+	trimPriceHistory(timestampMs);
+}
+
 export function recordMarketPricePoints(
 	tokenIdsByMarketId: Map<string, OutcomeTokenIds>,
 	pricesByTokenId: ClobPricesByTokenId,
@@ -131,6 +245,12 @@ export function recordMarketPricePoints(
 			continue;
 		}
 
+		latestQuoteByMarketId.set(marketId, {
+			noAsk: point.noAsk,
+			noBid: point.noBid,
+			yesAsk: point.yesAsk,
+			yesBid: point.yesBid,
+		});
 		const history = priceHistoryByMarketId.get(marketId) ?? [];
 		history.push(point);
 		priceHistoryByMarketId.set(marketId, history);
@@ -153,6 +273,7 @@ export function getPriceHistoryByMarketId(): Record<
 
 export function clearPriceHistory(): void {
 	priceHistoryByMarketId.clear();
+	latestQuoteByMarketId.clear();
 }
 
 function parseClobPrice(price: string | undefined): number | null {

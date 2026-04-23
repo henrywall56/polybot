@@ -1,6 +1,6 @@
 # Polybot Docs
 
-Polybot is a small Bun and TypeScript app for exploring Polymarket weather markets. The current product reads daily temperature markets from the Polymarket Gamma API, normalizes those raw markets into app-friendly records, stores a short live history of executable CLOB bid/ask prices, and displays the result in a React UI.
+Polybot is a small Bun and TypeScript app for exploring Polymarket weather markets. The current product reads daily temperature markets from the Polymarket Gamma API, normalizes those raw markets into app-friendly records, maintains live CLOB order book state for bot logic, stores a throttled bid/ask history for visualization, and displays the result in a React UI.
 
 ## Core Decisions
 
@@ -9,7 +9,7 @@ Polybot is a small Bun and TypeScript app for exploring Polymarket weather marke
 - **Zod** is used for runtime validation of environment variables and external API responses. This keeps failures early and explicit when Gamma changes shape or local config is missing.
 - **React** powers the browser UI. It is bundled by Bun from `src/ui/index.html` and `src/ui/app.tsx`.
 - **Plotly** powers the CLOB bid/ask graphs. The UI uses `react-plotly.js` with `plotly.js`.
-- **No database yet.** Market snapshots, CLOB price history, city/station matches, and weather snapshots are in memory only, so they reset when the Bun process restarts.
+- **No database yet.** Market snapshots, CLOB order books, CLOB price history, city/station matches, and weather snapshots are in memory only, so they reset when the Bun process restarts.
 
 ## Runtime Flow
 
@@ -21,7 +21,11 @@ Polybot is a small Bun and TypeScript app for exploring Polymarket weather marke
 The only required environment variable today is:
 
 - `POLYMARKET_GAMMA_BASE_URL`, validated as a URL in `src/config/env.ts`.
+
+Market-data defaults also live in `src/config/env.ts`:
+
 - `POLYMARKET_CLOB_BASE_URL`, defaulting to `https://clob.polymarket.com`.
+- `POLYMARKET_CLOB_WS_URL`, defaulting to `wss://ws-subscriptions-clob.polymarket.com/ws/market`.
 
 Weather-related environment values also live in `src/config/env.ts` and have defaults:
 
@@ -53,13 +57,13 @@ The poller prevents overlapping fetches. If a poll is still running when the nex
 
 Gamma remains the discovery and metadata source. It tells the app which events and markets exist, which tag they belong to, whether a market is active/closed, the market title, city-like labels, temperature bands, and the CLOB token IDs needed for trading data.
 
-CLOB is used only after Gamma has identified the relevant market and token IDs. It supplies executable top-of-book prices and, later, is the correct API surface for order books, order placement, cancellation, and other trading operations.
+CLOB is used only after Gamma has identified the relevant market and token IDs. Its market websocket supplies live order book snapshots, level changes, and top-of-book bid/ask updates. CLOB is the correct API surface for trading-oriented data, order placement, cancellation, and other trading operations.
 
 This split is intentional:
 
 - Gamma is event/market oriented and is better for browsing and filtering daily temperature markets.
 - CLOB is token/orderbook oriented and is better for prices and execution.
-- The internal model keeps Gamma metadata separate from CLOB bid/ask prices so display fields and executable trading data are not confused.
+- The internal model keeps Gamma metadata separate from CLOB order book and bid/ask data so display fields and executable trading data are not confused.
 
 ## Internal Market Shape
 
@@ -74,7 +78,7 @@ The normalized market keeps the Gamma-derived fields the app needs for display, 
 - Market state: `active`, `closed`, `acceptingOrders`.
 - Gamma display prices/liquidity: `bestBid`, `bestAsk`, `lastTradePrice`, `volume`, `liquidity`.
 
-Executable CLOB bid/ask prices are not stored on `TemperatureMarket`. They are tracked separately in `marketPriceHistoryByMarketId` so the app does not mix Gamma metadata/display prices with CLOB top-of-book trading data.
+Executable CLOB order book and bid/ask data are not stored on `TemperatureMarket`. They are tracked separately in `orderBookByMarketId` and `marketPriceHistoryByMarketId` so the app does not mix Gamma metadata/display prices with trading data.
 
 Market status labels in the UI come from Polymarket/Gamma fields only:
 
@@ -102,20 +106,31 @@ Temperature bands are parsed from `groupItemTitle`:
 - `"3-4°C"` becomes `temperatureMin=3`, `temperatureMax=4`, `unit="C"`.
 - A single value becomes both min and max.
 
-## CLOB Price History
+## CLOB Order Book and Price History
 
-`src/gamma/market-price-history.ts` stores a rolling one-hour CLOB top-of-book time series per market.
+`src/clob/market-websocket.ts` connects to Polymarket's public CLOB market websocket. `src/clob/order-book.ts` stores the latest known order book levels for bot logic. `src/gamma/market-price-history.ts` stores a rolling one-hour CLOB top-of-book time series per market for UI graphing.
 
 - Gamma's `outcomes` and `clobTokenIds` fields are JSON parsed together.
-- The app finds the `Yes` and `No` outcome indexes, then maps each outcome to its CLOB token ID.
-- CLOB `POST /prices` is queried for both token IDs with both sides:
-  - `BUY` is the ask price you would pay to buy that outcome.
-  - `SELL` is the bid price you would receive to sell that outcome.
+- The app finds the `Yes` and `No` outcome indexes, then maps each CLOB token ID to `{ marketId, outcome }`.
+- The Gamma poller refreshes the active token subscription set every 5 seconds.
+- The CLOB websocket subscribes with `custom_feature_enabled: true`, sends `PING` heartbeats every 10 seconds, and reconnects with exponential backoff.
+- `book` messages replace the full in-memory book for a token.
+- `price_change` messages update one price level immediately; `size === "0"` removes that level.
+- Internal order book maps keep all known levels. API/UI snapshots expose sorted top levels for inspection.
+- `best_bid_ask`, `book`, and `price_change` messages update the graph-facing best bid/ask history.
 - Gamma `outcomePrices` are not used for the graph or trading-style history because they are display/mark prices, not necessarily executable prices.
-- Each point stores `marketId`, `timestamp`, `yesBid`, `yesAsk`, `noBid`, and `noAsk`.
-- History is retained for 60 minutes and is session-only.
+- Graph points are throttled to at most one point per market per second, using the latest known Yes/No bid/ask values.
+- Price history is retained for 60 minutes and is session-only.
 
-The low-level CLOB response is token-based, but the app normalizes it into one internal object per binary market per poll:
+Order book terminology:
+
+- A bid is a price someone is offering to buy at.
+- An ask is a price someone is offering to sell at.
+- The best bid is the highest bid. The best ask is the lowest ask.
+- Order book levels are the full set of known bid/ask price levels and sizes behind those best prices.
+- Bot logic should consume the in-memory order book store, not the throttled UI graph history.
+
+The low-level CLOB stream is token-based, but the app normalizes graph points into one internal object per binary market:
 
 ```ts
 type MarketPricePoint = {
@@ -128,12 +143,13 @@ type MarketPricePoint = {
 };
 ```
 
-That shape is deliberate for current temperature markets because they are binary Yes/No markets and the UI usually needs the Yes and No quotes together. A lower-level per-outcome quote shape may be useful later for a generic trading engine or multi-outcome markets, but the current snapshot API exposes market-level points to avoid rejoining Yes and No quotes throughout the UI.
+That shape is deliberate for current temperature markets because they are binary Yes/No markets and the UI usually needs the Yes and No quotes together. The lower-level order book store remains per-outcome/token oriented for trading logic.
 
 The snapshot exposes this as:
 
 ```ts
 marketPriceHistoryByMarketId: Record<string, MarketPricePoint[]>
+orderBookByMarketId: Record<string, MarketOrderBookSnapshot>
 ```
 
 ## Weather Edge Layer
@@ -178,7 +194,7 @@ weatherByMarketId: Record<string, MarketWeatherSnapshot>
 
 ## React UI
 
-The UI polls `/api/temperature-markets` every 5 seconds, matching the backend Gamma polling cadence.
+The UI polls `/api/temperature-markets` every 5 seconds. The UI is a visualization/debug surface; it is not the source of trading state. Live order book state is maintained in memory on the backend from CLOB websocket events.
 
 The view model in `src/ui/view-model.ts` groups records as:
 
@@ -197,7 +213,7 @@ Each opened market shows:
 - Raw Gamma event payload.
 - Raw Gamma market payload.
 
-The graph view model displays CLOB prices as dollar-denominated contract prices, filters history by the selected horizon, pads the x-axis by 5% on both sides of the visible points, and narrows each graph's y-axis around its own bid/ask data so the spread remains visible.
+The graph view model displays throttled CLOB best bid/ask prices as dollar-denominated contract prices, filters history by the selected horizon, pads the x-axis by 5% on both sides of the visible points, and narrows each graph's y-axis around its own bid/ask data so the spread remains visible.
 
 ## Testing and Checks
 
@@ -211,7 +227,7 @@ Current scripts:
 Existing tests cover:
 
 - Gamma market normalization.
-- CLOB token mapping, executable bid/ask history, and rolling retention.
+- CLOB token mapping, websocket parsing, order book storage, executable bid/ask history, graph throttling, and rolling retention.
 - Weather API parsing, no-data behavior, geocoding parsing, station matching, distance calculation, and temperature-band comparison.
 - UI grouping, range rendering, graph horizon filtering, dollar price graph values, padded graph ranges, and empty graph series behavior.
 
@@ -220,7 +236,7 @@ Existing tests cover:
 Current live data sources:
 
 - Polymarket Gamma API for active daily temperature events and markets.
-- Polymarket CLOB API for executable Yes/No bid and ask prices.
+- Polymarket CLOB market websocket for live order book levels and executable Yes/No bid and ask prices.
 - Open-Meteo Geocoding API for city coordinates.
 - NOAA Aviation Weather Center Data API for METAR, TAF, and station metadata.
 
@@ -233,9 +249,9 @@ Current city location strategy:
 Current polling:
 
 - Gamma daily temperature markets: every 5 seconds.
-- CLOB bid/ask prices: once per successful Gamma poll, currently every 5 seconds.
+- CLOB order book levels and bid/ask prices: event-driven from the market websocket after each Gamma poll refreshes active token subscriptions.
 - UI snapshot refresh: every 5 seconds.
-- CLOB price history: recorded once per successful CLOB price poll.
+- CLOB price history: graph points are throttled to at most once per market per second.
 - METAR observations: around every 60 seconds.
 - TAF forecasts: around every 10 minutes.
 

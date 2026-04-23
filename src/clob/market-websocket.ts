@@ -9,6 +9,7 @@ const MAX_SUBSCRIPTION_BATCH_SIZE = 500;
 const INITIAL_RECONNECT_DELAY_MS = 1000;
 const MAX_RECONNECT_DELAY_MS = 30_000;
 const OPEN_READY_STATE = 1;
+const HEARTBEAT_INTERVAL_MS = 10_000;
 
 const bestBidAskMessageSchema = z.object({
 	asset_id: z.string(),
@@ -71,12 +72,14 @@ interface WebSocketLike {
 }
 
 interface ClobMarketPriceStreamOptions {
+	clearIntervalFn?: typeof clearInterval;
 	createWebSocket?: (url: string) => WebSocketLike;
 	onError?: (error: unknown) => void;
 	onFallbackRequested?: () => void;
 	onOrderBookLevelUpdate?: (update: OrderBookLevelUpdate) => void;
 	onOrderBookSnapshotUpdate?: (update: OrderBookSnapshotUpdate) => void;
 	onPriceUpdate: (update: ClobPriceUpdate) => void;
+	setIntervalFn?: typeof setInterval;
 	setTimeoutFn?: typeof setTimeout;
 	url?: string;
 }
@@ -92,7 +95,10 @@ export class ClobMarketPriceStream {
 		update: OrderBookSnapshotUpdate
 	) => void;
 	readonly #onPriceUpdate: (update: ClobPriceUpdate) => void;
+	readonly #clearInterval: typeof clearInterval;
+	#heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 	#reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
+	readonly #setInterval: typeof setInterval;
 	readonly #setTimeout: typeof setTimeout;
 	#subscribedAssetIds = new Set<string>();
 	readonly #url: string;
@@ -105,6 +111,8 @@ export class ClobMarketPriceStream {
 		onOrderBookLevelUpdate = noop,
 		onOrderBookSnapshotUpdate = noop,
 		onPriceUpdate,
+		clearIntervalFn = clearInterval,
+		setIntervalFn = setInterval,
 		setTimeoutFn = setTimeout,
 		url = env.POLYMARKET_CLOB_WS_URL,
 	}: ClobMarketPriceStreamOptions) {
@@ -114,6 +122,8 @@ export class ClobMarketPriceStream {
 		this.#onOrderBookLevelUpdate = onOrderBookLevelUpdate;
 		this.#onOrderBookSnapshotUpdate = onOrderBookSnapshotUpdate;
 		this.#onPriceUpdate = onPriceUpdate;
+		this.#clearInterval = clearIntervalFn;
+		this.#setInterval = setIntervalFn;
 		this.#setTimeout = setTimeoutFn;
 		this.#url = url;
 	}
@@ -143,6 +153,7 @@ export class ClobMarketPriceStream {
 
 	#closeConnection(): void {
 		this.#subscribedAssetIds.clear();
+		this.#stopHeartbeat();
 		this.#webSocket?.close();
 		this.#webSocket = null;
 	}
@@ -159,6 +170,7 @@ export class ClobMarketPriceStream {
 			this.#reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
 			this.#subscribedAssetIds.clear();
 			this.#subscribeInitial();
+			this.#startHeartbeat();
 		};
 		webSocket.onmessage = (event) => {
 			const parsedMessage = parseClobMarketDataMessage(event.data);
@@ -179,6 +191,7 @@ export class ClobMarketPriceStream {
 			if (this.#webSocket === webSocket) {
 				this.#webSocket = null;
 				this.#subscribedAssetIds.clear();
+				this.#stopHeartbeat();
 			}
 
 			if (!(this.#isStopped || this.#assetIds.size === 0)) {
@@ -217,7 +230,11 @@ export class ClobMarketPriceStream {
 		);
 
 		for (const assetIds of chunkArray(toSubscribe)) {
-			this.#send({ assets_ids: assetIds, operation: "subscribe" });
+			this.#send({
+				assets_ids: assetIds,
+				custom_feature_enabled: true,
+				operation: "subscribe",
+			});
 		}
 
 		for (const assetIds of chunkArray(toUnsubscribe)) {
@@ -232,7 +249,25 @@ export class ClobMarketPriceStream {
 			return;
 		}
 
-		this.#webSocket.send(JSON.stringify(message));
+		this.#webSocket.send(
+			typeof message === "string" ? message : JSON.stringify(message)
+		);
+	}
+
+	#startHeartbeat(): void {
+		this.#stopHeartbeat();
+		this.#heartbeatInterval = this.#setInterval(() => {
+			this.#send("PING");
+		}, HEARTBEAT_INTERVAL_MS);
+	}
+
+	#stopHeartbeat(): void {
+		if (this.#heartbeatInterval == null) {
+			return;
+		}
+
+		this.#clearInterval(this.#heartbeatInterval);
+		this.#heartbeatInterval = null;
 	}
 }
 

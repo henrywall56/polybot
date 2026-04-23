@@ -34,7 +34,18 @@ describe("temperature market store selectors", () => {
 				],
 			},
 			markets,
-			orderBookByMarketId: {},
+			orderBookByMarketId: {
+				[market.marketId]: {
+					marketId: market.marketId,
+					no: null,
+					yes: {
+						asks: [{ cumulativeSize: 10, price: 0.63, size: 10 }],
+						bids: [{ cumulativeSize: 5, price: 0.61, size: 5 }],
+						timestamp: "2026-04-23T10:00:00.000Z",
+						tokenId: "yes-token",
+					},
+				},
+			},
 			records: [{ event, market, rawMarket }],
 			updatedAt: "2026-04-23T10:00:00.000Z",
 			weatherByMarketId: {},
@@ -55,5 +66,8 @@ describe("temperature market store selectors", () => {
 		expect(
 			getTemperatureMarketDetailSnapshot(market.marketId)?.priceHistory
 		).toHaveLength(1);
+		expect(
+			getTemperatureMarketDetailSnapshot(market.marketId)?.orderBook?.yes?.asks
+		).toEqual([{ cumulativeSize: 10, price: 0.63, size: 10 }]);
 	});
 });

@@ -6,6 +6,10 @@ const envSchema = z.object({
 		.string()
 		.url()
 		.default("https://clob.polymarket.com"),
+	POLYMARKET_CLOB_WS_URL: z
+		.string()
+		.url()
+		.default("wss://ws-subscriptions-clob.polymarket.com/ws/market"),
 	AVIATION_WEATHER_BASE_URL: z
 		.string()
 		.url()

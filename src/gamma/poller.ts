@@ -1,6 +1,14 @@
+import { ClobMarketPriceStream } from "../clob/market-websocket.ts";
 import {
+	getOrderBookByMarketId,
+	recordOrderBookLevelUpdate,
+	recordOrderBookSnapshot,
+} from "../clob/order-book.ts";
+import {
+	buildOutcomeTokenMappings,
 	getPriceHistoryByMarketId,
-	recordMarketPriceHistory,
+	type OutcomeTokenMapping,
+	recordClobPriceUpdate,
 } from "./market-price-history.ts";
 import {
 	fetchAllActiveEventsByTagId,
@@ -23,6 +31,53 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 
 	let isRunning = false;
 	let lastLoggedMarketCount: number | null = null;
+	let tokenMappingByTokenId = new Map<string, OutcomeTokenMapping>();
+	const syncTradingDataSnapshot = (): void => {
+		const snapshot = getTemperatureMarketSnapshot();
+		setTemperatureMarketSnapshot({
+			...snapshot,
+			marketPriceHistoryByMarketId: getPriceHistoryByMarketId(),
+			orderBookByMarketId: getOrderBookByMarketId(),
+		});
+	};
+	const clobStream = new ClobMarketPriceStream({
+		onError: (error) => {
+			console.error("CLOB market websocket error:", error);
+		},
+		onFallbackRequested: () => {
+			console.error("CLOB market websocket disconnected; reconnecting");
+		},
+		onOrderBookLevelUpdate: (update) => {
+			const mapping = tokenMappingByTokenId.get(update.tokenId);
+
+			if (!mapping) {
+				return;
+			}
+
+			recordOrderBookLevelUpdate(mapping, update);
+			syncTradingDataSnapshot();
+		},
+		onOrderBookSnapshotUpdate: (update) => {
+			const mapping = tokenMappingByTokenId.get(update.tokenId);
+
+			if (!mapping) {
+				return;
+			}
+
+			recordOrderBookSnapshot(mapping, update);
+			syncTradingDataSnapshot();
+		},
+		onPriceUpdate: (update) => {
+			const mapping = tokenMappingByTokenId.get(update.tokenId);
+
+			if (!mapping) {
+				return;
+			}
+
+			recordClobPriceUpdate(mapping, update);
+			syncTradingDataSnapshot();
+		},
+	});
 
 	const runCycle = async (): Promise<void> => {
 		if (isRunning) {
@@ -55,11 +110,8 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 				return [{ event, market, rawMarket }];
 			});
 			const updatedAt = new Date().toISOString();
-			try {
-				await recordMarketPriceHistory(rawMarkets, new Date(updatedAt));
-			} catch (error) {
-				console.error("CLOB price history poll failed:", error);
-			}
+			tokenMappingByTokenId = buildOutcomeTokenMappings(rawMarkets);
+			clobStream.updateAssetIds(tokenMappingByTokenId.keys());
 			const elapsedMs = Date.now() - startedAt;
 
 			setTemperatureMarketSnapshot({
@@ -67,6 +119,7 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 				events,
 				marketPriceHistoryByMarketId: getPriceHistoryByMarketId(),
 				markets,
+				orderBookByMarketId: getOrderBookByMarketId(),
 				records,
 				updatedAt,
 				weatherByMarketId: getTemperatureMarketSnapshot().weatherByMarketId,
@@ -84,6 +137,7 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 				events: [],
 				marketPriceHistoryByMarketId: getPriceHistoryByMarketId(),
 				markets: [],
+				orderBookByMarketId: getOrderBookByMarketId(),
 				records: [],
 				updatedAt: null,
 				weatherByMarketId: getTemperatureMarketSnapshot().weatherByMarketId,
