@@ -1,4 +1,7 @@
-import { fetchAllActiveMarketsByTagId } from "./markets.ts";
+import {
+	fetchAllActiveEventsByTagId,
+	mapTemperatureMarkets,
+} from "./markets.ts";
 import { fetchTagBySlug } from "./tags.ts";
 
 const POLL_INTERVAL_MS = 5000;
@@ -24,10 +27,18 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 		const startedAt = Date.now();
 
 		try {
-			const markets = await fetchAllActiveMarketsByTagId(tag.id);
+			const events = await fetchAllActiveEventsByTagId(tag.id);
+			const markets = mapTemperatureMarkets(events);
 			const sample = markets
 				.slice(0, 3)
-				.map((market) => market.slug ?? market.question ?? market.id)
+				.map((market) =>
+					JSON.stringify({
+						city: market.city,
+						temperatureKind: market.temperatureKind,
+						temperatureBand: market.temperatureBand,
+						unit: market.unit,
+					})
+				)
 				.join(", ");
 			const elapsedMs = Date.now() - startedAt;
 
