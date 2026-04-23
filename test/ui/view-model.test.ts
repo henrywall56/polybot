@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { mapTemperatureMarkets } from "../../src/gamma/markets.ts";
 import {
+	buildProbabilityGraphSeries,
+	filterProbabilityHistory,
 	groupByCity,
 	renderTemperatureRange,
 	type TemperatureMarketRecord,
@@ -55,5 +57,61 @@ describe("UI view model", () => {
 		expect(renderTemperatureRange(unknown)).toBe(
 			"Will the weather band resolve tomorrow?"
 		);
+	});
+
+	test("filters probability history by recent horizon", () => {
+		const history = [
+			{
+				marketId: "market-1",
+				timestamp: "2026-04-23T10:00:00.000Z",
+				yesProbability: 0.1,
+			},
+			{
+				marketId: "market-1",
+				timestamp: "2026-04-23T10:04:00.000Z",
+				yesProbability: 0.2,
+			},
+			{
+				marketId: "market-1",
+				timestamp: "2026-04-23T10:05:00.000Z",
+				yesProbability: 0.3,
+			},
+		];
+
+		const filtered = filterProbabilityHistory(
+			history,
+			120_000,
+			Date.parse("2026-04-23T10:05:00.000Z")
+		);
+
+		expect(filtered.map((point) => point.yesProbability)).toEqual([0.2, 0.3]);
+		expect(filterProbabilityHistory(history, null)).toBe(history);
+	});
+
+	test("converts decimal probabilities to percent graph values", () => {
+		expect(
+			buildProbabilityGraphSeries([
+				{
+					marketId: "market-1",
+					timestamp: "2026-04-23T10:00:00.000Z",
+					yesProbability: 0.9995,
+				},
+				{
+					marketId: "market-1",
+					timestamp: "2026-04-23T10:05:00.000Z",
+					yesProbability: 0.4,
+				},
+			])
+		).toEqual({
+			percentValues: [99.95, 40],
+			timestamps: ["2026-04-23T10:00:00.000Z", "2026-04-23T10:05:00.000Z"],
+		});
+	});
+
+	test("returns empty graph arrays when history is empty", () => {
+		expect(buildProbabilityGraphSeries([])).toEqual({
+			percentValues: [],
+			timestamps: [],
+		});
 	});
 });

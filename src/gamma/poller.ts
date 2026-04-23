@@ -3,6 +3,10 @@ import {
 	type GammaMarket,
 	mapTemperatureMarkets,
 } from "./markets.ts";
+import {
+	getProbabilityHistoryByMarketId,
+	recordMarketProbabilityHistory,
+} from "./probability-history.ts";
 import { setTemperatureMarketSnapshot } from "./store.ts";
 import { fetchTagBySlug } from "./tags.ts";
 
@@ -30,12 +34,11 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 
 		try {
 			const events = await fetchAllActiveEventsByTagId(tag.id);
+			const rawMarkets = events.flatMap((event) => event.markets);
 			const markets = mapTemperatureMarkets(events);
 			const marketMap = new Map<string, GammaMarket>();
-			for (const event of events) {
-				for (const market of event.markets) {
-					marketMap.set(market.id, market);
-				}
+			for (const market of rawMarkets) {
+				marketMap.set(market.id, market);
 			}
 			const records = markets.flatMap((market) => {
 				const event = events.find((item) => item.id === market.eventId);
@@ -48,24 +51,14 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 				return [{ event, market, rawMarket }];
 			});
 			const updatedAt = new Date().toISOString();
-			const sample = markets
-				.slice(0, 3)
-				.map((market) =>
-					JSON.stringify({
-						city: market.city,
-						temperatureKind: market.temperatureKind,
-						temperatureMax: market.temperatureMax,
-						temperatureMin: market.temperatureMin,
-						unit: market.unit,
-					})
-				)
-				.join(", ");
+			recordMarketProbabilityHistory(rawMarkets, new Date(updatedAt));
 			const elapsedMs = Date.now() - startedAt;
 
 			setTemperatureMarketSnapshot({
 				error: null,
 				events,
 				markets,
+				probabilityHistoryByMarketId: getProbabilityHistoryByMarketId(),
 				records,
 				updatedAt,
 			});
@@ -73,15 +66,12 @@ export async function startTemperatureMarketPolling(): Promise<void> {
 			console.log(
 				`Gamma poll fetched ${markets.length} markets in ${elapsedMs}ms`
 			);
-
-			if (sample) {
-				console.log(`Sample markets: ${sample}`);
-			}
 		} catch (error) {
 			setTemperatureMarketSnapshot({
 				error: error instanceof Error ? error.message : String(error),
 				events: [],
 				markets: [],
+				probabilityHistoryByMarketId: getProbabilityHistoryByMarketId(),
 				records: [],
 				updatedAt: null,
 			});

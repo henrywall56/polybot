@@ -3,6 +3,7 @@ import type {
 	GammaMarket,
 	TemperatureMarket,
 } from "../gamma/markets.ts";
+import type { MarketProbabilityPoint } from "../gamma/probability-history.ts";
 
 export interface TemperatureMarketRecord {
 	event: GammaEvent;
@@ -18,6 +19,31 @@ export interface GroupedEvent {
 export interface GroupedCity {
 	city: string;
 	events: GroupedEvent[];
+}
+
+export type ProbabilityGraphHorizon =
+	| 60_000
+	| 120_000
+	| 180_000
+	| 240_000
+	| 300_000
+	| null;
+
+export const probabilityGraphHorizons: Array<{
+	label: string;
+	value: ProbabilityGraphHorizon;
+}> = [
+	{ label: "1m", value: 60_000 },
+	{ label: "2m", value: 120_000 },
+	{ label: "3m", value: 180_000 },
+	{ label: "4m", value: 240_000 },
+	{ label: "5m", value: 300_000 },
+	{ label: "All retained", value: null },
+];
+
+export interface ProbabilityGraphSeries {
+	percentValues: number[];
+	timestamps: string[];
 }
 
 export function groupByCity(records: TemperatureMarketRecord[]): GroupedCity[] {
@@ -62,4 +88,27 @@ export function renderTemperatureRange(market: TemperatureMarket): string {
 	}
 
 	return `${market.temperatureMin}-${market.temperatureMax}${market.unit ?? ""}`;
+}
+
+export function filterProbabilityHistory(
+	history: MarketProbabilityPoint[],
+	horizon: ProbabilityGraphHorizon,
+	now = Date.now()
+): MarketProbabilityPoint[] {
+	if (horizon == null) {
+		return history;
+	}
+
+	const cutoff = now - horizon;
+
+	return history.filter((point) => Date.parse(point.timestamp) >= cutoff);
+}
+
+export function buildProbabilityGraphSeries(
+	history: MarketProbabilityPoint[]
+): ProbabilityGraphSeries {
+	return {
+		percentValues: history.map((point) => point.yesProbability * 100),
+		timestamps: history.map((point) => point.timestamp),
+	};
 }
