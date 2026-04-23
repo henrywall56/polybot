@@ -7,6 +7,11 @@ const gammaMarketSchema = z.object({
   question: z.string().nullable(),
 });
 
+const gammaEventSchema = z.object({
+  id: z.string(),
+  markets: z.array(gammaMarketSchema).default([]),
+});
+
 export type GammaMarket = z.infer<typeof gammaMarketSchema>;
 
 const PAGE_SIZE = 100;
@@ -16,7 +21,7 @@ export async function fetchAllActiveMarketsByTagId(tagId: string): Promise<Gamma
   let offset = 0;
 
   while (true) {
-    const url = new URL("/markets", env.POLYMARKET_GAMMA_BASE_URL);
+    const url = new URL("/events", env.POLYMARKET_GAMMA_BASE_URL);
 
     url.searchParams.set("active", "true");
     url.searchParams.set("closed", "false");
@@ -27,13 +32,15 @@ export async function fetchAllActiveMarketsByTagId(tagId: string): Promise<Gamma
     const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error(`Gamma markets fetch failed: ${response.status} ${response.statusText}`);
+      throw new Error(`Gamma events fetch failed: ${response.status} ${response.statusText}`);
     }
 
     const json = await response.json();
-    const page = z.array(gammaMarketSchema).parse(json);
+    const page = z.array(gammaEventSchema).parse(json);
 
-    markets.push(...page);
+    for (const event of page) {
+      markets.push(...event.markets);
+    }
 
     if (page.length < PAGE_SIZE) {
       return markets;

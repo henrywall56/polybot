@@ -2,7 +2,7 @@ import { fetchAllActiveMarketsByTagId } from "./markets.ts";
 import { fetchTagBySlug } from "./tags.ts";
 
 const POLL_INTERVAL_MS = 5_000;
-const TEMPERATURE_TAG_SLUG = "temperature";
+const TEMPERATURE_TAG_SLUG = "daily-temperature";
 
 export async function startTemperatureMarketPolling(): Promise<void> {
   const tag = await fetchTagBySlug(TEMPERATURE_TAG_SLUG);
